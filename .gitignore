@@ -3,7 +3,7 @@ node_modules
 dist
 tmp
 npm-debug.log
-.crt
-.csr
-.key
-.pem
+*.crt
+*.csr
+*.key
+*.pem
