@@ -26,4 +26,4 @@ process.on('unhandledRejection', function(reason, p) {
 
 // client.on('close', err => console.log('close, err: ' + err));
 
-new NevfairBot('nevace', '$hadow65');
+new NevfairBot('nevace', '$hadow65', 'uZ38LvLtpbk7cysA');

@@ -10,7 +10,6 @@ class BetFairClient {
     this.config = {
       headers: {
         'Accept': 'application/json',
-        'X-Application': 'uZ38LvLtpbk7cysA',
         'Content-Type': 'application/x-www-form-urlencoded'
       }
     }
@@ -25,7 +24,8 @@ class BetFairClient {
       .catch(err => console.log(err))
   }
 
-  login(username, password) {
+  login(username, password, appKey) {
+    this.config.headers['X-Application'] = appKey;
     return this._checkIfCurrentSession(username)
       .then(session => {
         if (session) return session;
