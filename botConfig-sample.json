@@ -1,0 +1,10 @@
+{
+  "accounts": [{
+    "credentials": {
+      "username": "",
+      "password": "",
+      "appKey": ""
+    },
+    "NevBotInstances": [{ "strategy": "test" }]
+  }]
+}

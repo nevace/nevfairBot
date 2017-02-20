@@ -24,7 +24,8 @@ class BetFairClient {
       .catch(err => console.log(err))
   }
 
-  login(username, password, appKey) {
+  login(credentials) {
+    const { username, password, appKey } = credentials;
     this.config.headers['X-Application'] = appKey;
     return this._checkIfCurrentSession(username)
       .then(session => {
