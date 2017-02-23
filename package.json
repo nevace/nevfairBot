@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node_modules/.bin/mocha",
+    "test-verbose": "node_modules/.bin/mocha -R spec"
   },
   "author": "",
   "license": "ISC",
@@ -15,8 +16,14 @@
     "mongodb": "^2.2.24",
     "mz": "^2.6.0",
     "random-id": "0.0.2",
-    "socket.io-client": "^1.7.2",
-    "utf-8-validate": "^3.0.1",
-    "ws": "^2.0.3"
+    "utf-8-validate": "^3.0.1"
+  },
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "chai-as-promised": "^6.0.0",
+    "mocha": "^3.2.0",
+    "sinon": "^1.17.7",
+    "sinon-as-promised": "^4.0.2",
+    "sinon-chai": "^2.8.0"
   }
 }

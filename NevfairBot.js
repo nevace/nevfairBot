@@ -15,7 +15,7 @@ class NevfairBot {
       .then(session => {
         console.log(session)
         this.session = session
-        return StreamFactory.init(this.credentials.appKey, this.session.token, this.config);
+        return StreamFactory.init(this.credentials.appKey, this.session.token, this.config, this.credentials.username);
       })
       .then(streams => this.streams = streams)
       .catch(err => console.log(err))

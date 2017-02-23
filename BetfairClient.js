@@ -11,17 +11,12 @@ class BetFairClient {
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    }
-
-    Promise.all([fs.readFile('./client-2048.crt'), fs.readFile('./client-2048.key')])
-      .then(cert => {
-        this.config.httpsAgent = new https.Agent({
-          cert: cert[0].toString(),
-          key: cert[1].toString()
-        });
+      },
+      httpsAgent: new https.Agent({
+        cert: fs.readFileSync('./client-2048.crt'),
+        key: fs.readFileSync('./client-2048.key')
       })
-      .catch(err => console.log(err))
+    }
   }
 
   login(credentials) {
@@ -43,14 +38,14 @@ class BetFairClient {
       )
       .then(res => {
         session = { token: res.data.sessionToken, start: new Date() }
-        return DB.db
+        return DB
       })
       .then(db => db.collection('users').findOneAndUpdate({ username }, { $set: { session } }))
       .then(() => session)
   }
 
   _checkIfCurrentSession(username) {
-    return DB.db
+    return DB
       .then(db => db.collection('users').findOne({ username }))
       .then(user => {
         if (!user.session) return;
