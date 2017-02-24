@@ -1,21 +1,16 @@
+const log = require('./log');
 const NevfairBot = require('./NevfairBot');
 const fs = require('mz/fs');
+const botConfig = require('./botConfig.json');
+
+for (let account of botConfig.accounts) {
+  let credentials = account.credentials;
+
+  for (let botSettings of account.NevfairBotInstances) {
+    new NevfairBot(credentials, botSettings)
+  }
+}
 
 process.on('unhandledRejection', function(reason, p) {
-  console.log("Possibly Unhandled Rejection at: Promise ", p, " reason: ", reason);
-  // application specific logging here
+  log.error('Unhandled Rejection at: Promise ', p, ' reason: ', reason);
 });
-
-fs.readFile('./botConfig.json')
-  .then(config => {
-    const parsedData = JSON.parse(config);
-
-    for (let account of parsedData.accounts) {
-      let credentials = account.credentials;
-
-      for (let botSettings of account.NevfairBotInstances) {
-        new NevfairBot(credentials, botSettings)
-      }
-    }
-  })
-  .catch(err => console.log(err))

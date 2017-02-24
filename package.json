@@ -12,11 +12,15 @@
   "dependencies": {
     "axios": "^0.15.3",
     "bufferutil": "^2.0.1",
+    "ldjson": "0.0.6",
     "moment": "^2.17.1",
     "mongodb": "^2.2.24",
     "mz": "^2.6.0",
+    "npm": "^4.3.0",
     "random-id": "0.0.2",
-    "utf-8-validate": "^3.0.1"
+    "utf-8-validate": "^3.0.1",
+    "winston": "^2.3.1",
+    "winston-mongodb": "^2.0.7"
   },
   "devDependencies": {
     "chai": "^3.5.0",

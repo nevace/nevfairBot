@@ -1,6 +1,7 @@
 const tls = require('tls');
 const randomId = require('random-id');
 const DB = require('./DB');
+const log = require('./log');
 
 class StreamBase {
   constructor(appKey, session, strategy, username) {
@@ -9,11 +10,12 @@ class StreamBase {
     this.strategy = strategy;
     this.username = username;
     this.stream = tls.connect({ port: 443, host: 'stream-api-integration.betfair.com' });
-    this.stream.on('error', this._handleErr);
-    this.stream.on('data', this._handleData);
-    this.stream.on('close', this._handleSocketClose);
-    this.stream.on('end', this._handleSocketEnd);
+    this.stream.on('error', this._handleErr.bind(this));
+    this.stream.on('data', this._handleData.bind(this));
+    this.stream.on('close', this._handleSocketClose.bind(this));
+    this.stream.on('end', this._handleSocketEnd.bind(this));
     this.stream.on('connect', this._handleConnect.bind(this));
+    this.data = '';
   }
 
   _authenticate(appKey, session) {
@@ -26,12 +28,8 @@ class StreamBase {
 
   _sendData(data) {
     data.id = parseInt(randomId(9, '0'));
-    console.log('write', data)
     this.stream.write(this._parseReq(data));
-
-    DB
-      .then(db => db.collection('data').insertOne({ data, username: this.username, created: new Date() }))
-      .catch((err) => console.log(err))
+    log.info('write', { data, username: this.username, stream: this.constructor.name })
   }
 
   _parseReq(obj) {
@@ -41,36 +39,48 @@ class StreamBase {
   _subscribe() {}
 
   _handleConnect() {
-    console.log('connected');
+    log.debug('connected');
     this._authenticate(this.appkey, this.session);
     this._subscribe();
   }
 
   _handleErr(err) {
-    console.log(err)
+    log.error('socket error', { error: err, username: this.username, stream: this.constructor.name })
   }
 
   _handleData(rawData) {
-    console.log(rawData.toString())
-      // const data = JSON.parse(rawData);
+    const stringData = rawData.toString()
+    this.data += stringData;
 
-    // if (data.statusCode !== 'SUCCESS') {
-    //   console.log('read', data)
-    // }
+    if (this.data.includes('\r\n')) {
+      let dataArr = this.data.split('\r\n');
+      dataArr.pop();
 
-    // if (data.statusCode !== 'SUCCESS' || data.op === 'connection') {
-    //   DB
-    //     .then(db => db.collection('data').insertOne({ data, username: this.username, created: new Date() }))
-    //     .catch((err) => console.log(err))
-    // }
+      for (let jsonString of dataArr) {
+        const data = JSON.parse(jsonString);
+
+        log.debug(data);
+
+        if (data.op === 'connection') {
+          log.info('read', { data, username: this.username, stream: this.constructor.name });
+        }
+
+        if (data.statusCode === 'FAILURE') {
+          log.error('read', { data, username: this.username, stream: this.constructor.name });
+        }
+
+      }
+
+      this.data = '';
+    }
   }
 
   _handleSocketEnd() {
-    console.log('socket ended')
+    log.debug('socket ended', { username: this.username, stream: this.constructor.name })
   }
 
   _handleSocketClose(hasErr) {
-    console.log('close, err: ' + hasErr)
+    log.info('socket closed', { error: hasErr, username: this.username, stream: this.constructor.name })
   }
 
 }
