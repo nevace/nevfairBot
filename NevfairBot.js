@@ -3,9 +3,9 @@ const StreamFactory = require('./StreamFactory');
 const log = require('./log');
 
 class NevfairBot {
-  constructor(credentials, config) {
+  constructor(credentials, strategies) {
     this.credentials = credentials;
-    this.config = config;
+    this.strategies = strategies;
     this.streams;
     this.session;
     this._init();
@@ -16,7 +16,7 @@ class NevfairBot {
       .then(session => {
         log.debug(session)
         this.session = session
-        return StreamFactory.init(this.credentials.appKey, this.session.token, this.config, this.credentials.username);
+        return StreamFactory.init(this.credentials.appKey, this.session.token, this.strategies, this.credentials.username);
       })
       .then(streams => this.streams = streams)
       .catch(err => log.error(err))

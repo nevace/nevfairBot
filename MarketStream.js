@@ -8,7 +8,7 @@ class MarketStream extends StreamBase {
     this._sendData({
       op: 'marketSubscription',
       marketFilter: {
-        marketIds: ['1.129915791'],
+        // marketIds: ['1.129915791'],
         // bspMarket: true,
         bettingTypes: ['ODDS'],
         eventTypeIds: ['7'],

@@ -10,11 +10,11 @@ class StreamBase {
     this.strategy = strategy;
     this.username = username;
     this.stream = tls.connect({ port: 443, host: 'stream-api-integration.betfair.com' });
+    this.stream.on('connect', this._handleConnect.bind(this));
     this.stream.on('error', this._handleErr.bind(this));
     this.stream.on('data', this._handleData.bind(this));
-    this.stream.on('close', this._handleSocketClose.bind(this));
     this.stream.on('end', this._handleSocketEnd.bind(this));
-    this.stream.on('connect', this._handleConnect.bind(this));
+    this.stream.on('close', this._handleSocketClose.bind(this));
     this.data = '';
   }
 
@@ -59,7 +59,7 @@ class StreamBase {
       for (let jsonString of dataArr) {
         const data = JSON.parse(jsonString);
 
-        log.debug(data);
+        this._passToStrategy(data);
 
         if (data.op === 'connection') {
           log.info('read', { data, username: this.username, stream: this.constructor.name });
@@ -73,6 +73,10 @@ class StreamBase {
 
       this.data = '';
     }
+  }
+
+  _passToStrategy(data) {
+
   }
 
   _handleSocketEnd() {

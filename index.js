@@ -6,11 +6,7 @@ const botConfig = require('./botConfig.json');
 for (let account of botConfig.accounts) {
   let credentials = account.credentials;
 
-  for (let botSettings of account.NevfairBotInstances) {
-    new NevfairBot(credentials, botSettings)
-  }
+  new NevfairBot(credentials, account.strategies)
 }
 
-process.on('unhandledRejection', function(reason, p) {
-  log.error('Unhandled Rejection at: Promise ', p, ' reason: ', reason);
-});
+process.on('unhandledRejection', (reason, p) => log.error('Unhandled Rejection at: Promise ', p, ' reason: ', reason));
