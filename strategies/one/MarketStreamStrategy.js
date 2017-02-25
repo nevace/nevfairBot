@@ -27,7 +27,7 @@ class MarketStreamStrategy {
   analyse(data) {
     //first image
     if (data.ct === 'SUB_IMAGE' || data.ct === 'RESUB_DELTA') {
-      log.info('read', { data, username: this.username, stream: this.stream });
+      log.info('read', { data, username: this.username, stream: this.stream, strategy: 'one' });
       return;
     }
 

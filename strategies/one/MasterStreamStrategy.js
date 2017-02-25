@@ -7,7 +7,7 @@ class MasterStreamStrategy {
     this.subscriptionConfig = {
       op: 'marketSubscription',
       marketFilter: {
-        marketIds: ['1.129939439'],
+        marketIds: ['1.129939444'],
         bspMarket: true,
         bettingTypes: ['ODDS'],
         eventTypeIds: ['7'],
@@ -24,7 +24,7 @@ class MasterStreamStrategy {
   analyse(data) {
     //first image
     if (data.ct === 'SUB_IMAGE' || data.ct === 'RESUB_DELTA') {
-      log.info('read', { data, username: this.username, stream: this.stream });
+      log.info('read', { data, username: this.username, stream: this.stream, strategy: 'one' });
       return;
     }
 

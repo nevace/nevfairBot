@@ -4,7 +4,7 @@ const log = require('../log');
 
 class StreamBase {
   constructor(appKey, session, strategy, username) {
-    this.appkey = appKey;
+    this.appKey = appKey;
     this.session = session;
     this.strategy = strategy;
     this.username = username;
@@ -28,7 +28,7 @@ class StreamBase {
   _sendData(data) {
     data.id = parseInt(randomId(9, '0'));
     this.stream.write(this._parseReq(data));
-    log.info('write', { data, username: this.username, stream: this.constructor.name })
+    log.info('write', { data, username: this.username, stream: this.constructor.name, strategy: this.strategy.strategy })
   }
 
   _parseReq(obj) {
@@ -44,7 +44,7 @@ class StreamBase {
   }
 
   _handleErr(err) {
-    log.error('socket error', { error: err, username: this.username, stream: this.constructor.name })
+    log.error('socket error', { error: err, username: this.username, stream: this.constructor.name, strategy: this.strategy.strategy })
   }
 
   _handleData(rawData) {
@@ -61,11 +61,11 @@ class StreamBase {
         this._passToStrategy(data);
 
         if (data.op === 'connection') {
-          log.info('read', { data, username: this.username, stream: this.constructor.name });
+          log.info('read', { data, username: this.username, stream: this.constructor.name, strategy: this.strategy.strategy });
         }
 
         if (data.statusCode === 'FAILURE') {
-          log.error('read', { data, username: this.username, stream: this.constructor.name });
+          log.error('read', { data, username: this.username, stream: this.constructor.name, strategy: this.strategy.strategy });
         }
 
       }
@@ -79,11 +79,11 @@ class StreamBase {
   }
 
   _handleSocketEnd() {
-    log.debug('socket ended', { username: this.username, stream: this.constructor.name })
+    log.debug('socket ended', { username: this.username, stream: this.constructor.name, strategy: this.strategy.strategy })
   }
 
   _handleSocketClose(hasErr) {
-    log.info('socket closed', { error: hasErr, username: this.username, stream: this.constructor.name })
+    log.info('socket closed', { error: hasErr, username: this.username, stream: this.constructor.name, strategy: this.strategy.strategy })
   }
 
 }
