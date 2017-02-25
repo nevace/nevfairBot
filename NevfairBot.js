@@ -1,12 +1,11 @@
 const BetfairClient = require('./BetfairClient');
-const StreamFactory = require('./StreamFactory');
+const StreamFactory = require('./streams/StreamFactory');
 const log = require('./log');
-
+// console.log(StreamFactory.createStream)
 class NevfairBot {
   constructor(credentials, strategies) {
     this.credentials = credentials;
     this.strategies = strategies;
-    this.streams;
     this.session;
     this._init();
   }
@@ -16,9 +15,8 @@ class NevfairBot {
       .then(session => {
         log.debug(session)
         this.session = session
-        return StreamFactory.init(this.credentials.appKey, this.session.token, this.strategies, this.credentials.username);
+        StreamFactory.init(this.credentials.appKey, this.session.token, this.strategies, this.credentials.username);
       })
-      .then(streams => this.streams = streams)
       .catch(err => log.error(err))
   }
 }

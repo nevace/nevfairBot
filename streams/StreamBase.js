@@ -1,7 +1,6 @@
 const tls = require('tls');
 const randomId = require('random-id');
-const DB = require('./DB');
-const log = require('./log');
+const log = require('../log');
 
 class StreamBase {
   constructor(appKey, session, strategy, username) {
@@ -18,11 +17,11 @@ class StreamBase {
     this.data = '';
   }
 
-  _authenticate(appKey, session) {
+  _authenticate() {
     this._sendData({
       op: 'authentication',
-      appKey,
-      session
+      appKey: this.appkey,
+      session: this.session
     });
   }
 
@@ -40,7 +39,7 @@ class StreamBase {
 
   _handleConnect() {
     log.debug('connected');
-    this._authenticate(this.appkey, this.session);
+    this._authenticate();
     this._subscribe();
   }
 
