@@ -10,18 +10,18 @@ class MarketStreamStrategy {
       op: 'marketSubscription',
       marketFilter: {
         marketIds: [market.id],
-        bspMarket: true,
-        bettingTypes: ['ODDS'],
-        eventTypeIds: ['7'],
-        turnInPlayEnabled: true,
-        marketTypes: ['WIN'],
-        countryCodes: ['GBR']
       },
       marketDataFilter: {
         fields: ['EX_BEST_OFFERS_DISP'],
         ladderLevels: 1
       }
     }
+    this.runners = {};
+
+    for (let runner of market.marketDefinition.runners) {
+      this.runners[runner.id] = runner;
+    }
+
   }
 
   analyse(data) {
@@ -31,13 +31,37 @@ class MarketStreamStrategy {
       return;
     }
 
-    log.debug('marketStream data', { data, username: this.username, stream: this.stream });
+    //changes - bot logic
+    if (data.op === 'mcm' && data.mc && data.mc.length) {
+      for (let runner of data.mc[0].rc) {
+        //if there are no open bets on this runner
+        if (!this.runners[runner.id].betOpen) {
+          //and the SP is >= 20
+          if (this.runners[runner.id].bsp >= 20) {
+            //and the back price is >= 10% above SP but <=30
+            if (runner.bdatb && runner.bdatb.length && runner.bdatb[0][1] <= 30 && ((runner.bdatb[0][1] / this.runners[runner.id].bsp) >= 1.1)) {
+              //place lay bet
+              this.runners[runner.id].betOpen = true;
+              // this.runners[runner.id].lay = 
+              console.log('place bet')
+              log.debug('read', { data: runner, username: this.username, stream: this.stream, strategy: 'one' });
+            }
+            //the SP is < 20
+          } else {
+            //and the back price is >= 20 but <= 30
+            if (runner.bdatb && runner.bdatb.length && runner.bdatb[0][1] >= 20 && runner.bdatb[0][1] <= 30) {
+              //place lay bet
+              console.log('place bet')
+              this.runners[runner.id].betOpen = true;
+              log.debug('read', { data: runner, username: this.username, stream: this.stream, strategy: 'one' });
+            }
+          }
+        } else {
 
-    // //changes
-    // if (data.op === 'mcm' && data.mc && data.mc.length) {
-    //   const marketChanges = data.mc.filter(market => market.marketDefinition.inPlay);
-    //   return marketChanges.length ? marketChanges : false;
-    // }
+        }
+      }
+      log.debug('read', { data: this.runners, username: this.username, stream: this.stream, strategy: 'one' });
+    }
   }
 
 }

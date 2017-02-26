@@ -20,12 +20,19 @@ class MasterStream extends StreamBase {
     if (marketChanges) {
       for (let market of marketChanges) {
         if (market.inPlay) {
+          //this will only exist if a market is suspended between turning in play
+          //so ignore, don't create new stream
+          if (this.streams[market.market.id]) return
           this.streams[market.market.id] = {};
-          this.streams[market.market.id].market = this.StreamFactory.createStream(this.appKey, this.session, 'market', this.strategy, this.username, market);
-          log.debug('masterStream cache', { data: this.streams, username: this.username, stream: this.constructor.name });
+          this.streams[market.market.id].market = this.StreamFactory.createStream(this.appKey, this.session, 'market', this.strategy, this.username, market.market);
+          log.debug('masterStream cache', { data: this.streams, username: this.username, stream: this.constructor.name, strategy: this.strategy.strategy });
         } else {
-          delete this.streams[market.id];
-          log.debug('masterStream cache', { data: this.streams, username: this.username, stream: this.constructor.name });
+          if (this.streams[market.market.id]) {
+            this.streams[market.market.id].market.stream.end();
+            this.streams[market.market.id].market = null;
+            delete this.streams[market.market.id];
+            log.debug('masterStream cache', { data: this.streams, username: this.username, stream: this.constructor.name, strategy: this.strategy.strategy });
+          }
         }
       }
     }

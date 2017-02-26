@@ -20,7 +20,7 @@ class StreamBase {
   _authenticate() {
     this._sendData({
       op: 'authentication',
-      appKey: this.appkey,
+      appKey: this.appKey,
       session: this.session
     });
   }

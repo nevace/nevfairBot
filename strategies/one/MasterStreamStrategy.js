@@ -7,7 +7,6 @@ class MasterStreamStrategy {
     this.subscriptionConfig = {
       op: 'marketSubscription',
       marketFilter: {
-        marketIds: ['1.129939444'],
         bspMarket: true,
         bettingTypes: ['ODDS'],
         eventTypeIds: ['7'],
@@ -30,7 +29,7 @@ class MasterStreamStrategy {
 
     //changes
     if (data.op === 'mcm' && data.mc && data.mc.length) {
-      log.debug('masterStream data', { data, username: this.username, stream: this.stream });
+      //log.debug('masterStream data', { data, username: this.username, stream: this.stream });
       const marketsOpeningOrClosing = data.mc.filter(market => {
         return (market.marketDefinition.inPlay && market.marketDefinition.status === 'OPEN') ||
           (market.marketDefinition.inPlay && market.marketDefinition.status === 'CLOSED');
