@@ -28,6 +28,10 @@ class MasterStream extends StreamBase {
           log.debug('masterStream cache', { data: this.streams, username: this.username, stream: this.constructor.name, strategy: this.strategy.strategy });
         } else {
           if (this.streams[market.market.id]) {
+            //if debug, calculate PL
+            if (this.streams[market.market.id].market.debug) {
+              this.streams[market.market.id].market.calculatePL();
+            }
             this.streams[market.market.id].market.stream.end();
             this.streams[market.market.id].market = null;
             delete this.streams[market.market.id];
