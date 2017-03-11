@@ -8,7 +8,7 @@ class StreamBase {
     this.session = session;
     this.strategy = strategy;
     this.username = username;
-    this.stream = tls.connect({ port: 443, host: 'stream-api-integration.betfair.com' });
+    this.stream = tls.connect({port: 443, host: 'stream-api-integration.betfair.com'});
     this.stream.on('connect', this._handleConnect.bind(this));
     this.stream.on('error', this._handleErr.bind(this));
     this.stream.on('data', this._handleData.bind(this));
@@ -17,39 +17,55 @@ class StreamBase {
     this.data = '';
   }
 
-  _authenticate() {
+  _handleConnect(meta = {}) {
+    log.debug('connected');
+    this._authenticate(meta);
+    this._sendData(this.strategyIns.subscriptionConfig);
+  }
+
+  _authenticate(meta = {}) {
     this._sendData({
       op: 'authentication',
       appKey: this.appKey,
       session: this.session
-    });
+    }, meta);
   }
 
-  _sendData(data) {
+  _sendData(data, meta = {}) {
     data.id = parseInt(randomId(9, '0'));
+
+    const logData = {
+      data,
+      username: this.username,
+      stream: this.constructor.name,
+      strategy: this.strategy.strategy
+    };
+
+    Object.assign(logData, meta);
+
     this.stream.write(this._parseReq(data));
-    log.info('write', { data, username: this.username, stream: this.constructor.name, strategy: this.strategy.strategy })
+    log.info('write', logData);
   }
 
   _parseReq(obj) {
-    return `${JSON.stringify(obj)}\r\n`
+    return `${JSON.stringify(obj)}\r\n`;
   }
 
-  _subscribe() {}
+  _handleErr(err, meta = {}) {
+    const logData = {
+      error: err,
+      username: this.username,
+      stream: this.constructor.name,
+      strategy: this.strategy.strategy
+    };
 
-  _handleConnect() {
-    log.debug('connected');
-    this._authenticate();
-    this._subscribe();
+    Object.assign(logData, meta);
+
+    log.error('socket error', logData);
   }
 
-  _handleErr(err) {
-    log.error('socket error', { error: err, username: this.username, stream: this.constructor.name, strategy: this.strategy.strategy })
-  }
-
-  _handleData(rawData) {
-    const stringData = rawData.toString()
-    this.data += stringData;
+  _handleData(rawData, meta = {}) {
+    this.data += rawData.toString();
 
     if (this.data.includes('\r\n')) {
       let dataArr = this.data.split('\r\n');
@@ -57,15 +73,23 @@ class StreamBase {
 
       for (let jsonString of dataArr) {
         const data = JSON.parse(jsonString);
+        const logData = {
+          data,
+          username: this.username,
+          stream: this.constructor.name,
+          strategy: this.strategy.strategy
+        };
+
+        Object.assign(logData, meta);
 
         this._passToStrategy(data);
 
         if (data.op === 'connection') {
-          log.info('read', { data, username: this.username, stream: this.constructor.name, strategy: this.strategy.strategy });
+          log.info('read', logData);
         }
 
         if (data.statusCode === 'FAILURE') {
-          log.error('read', { data, username: this.username, stream: this.constructor.name, strategy: this.strategy.strategy });
+          log.error('read', logData);
         }
 
       }
@@ -75,15 +99,29 @@ class StreamBase {
   }
 
   _passToStrategy(data) {
-
   }
 
-  _handleSocketEnd() {
-    log.debug('socket ended', { username: this.username, stream: this.constructor.name, strategy: this.strategy.strategy })
+  _handleSocketEnd(meta = {}) {
+    const logData = {
+      username: this.username,
+      stream: this.constructor.name,
+      strategy: this.strategy.strategy
+    };
+
+    Object.assign(logData, meta);
+    log.debug('socket ended', logData);
   }
 
-  _handleSocketClose(hasErr) {
-    log.info('socket closed', { error: hasErr, username: this.username, stream: this.constructor.name, strategy: this.strategy.strategy })
+  _handleSocketClose(hasErr, meta = {}) {
+    const logData = {
+      error: hasErr,
+      username: this.username,
+      stream: this.constructor.name,
+      strategy: this.strategy.strategy
+    };
+
+    Object.assign(logData, meta);
+    log.info('socket closed', logData);
   }
 
 }

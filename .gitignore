@@ -1,6 +1,5 @@
 .DS_Store
 node_modules
-dist
 tmp
 npm-debug.log
 botConfig.json
@@ -8,3 +7,5 @@ botConfig.json
 *.csr
 *.key
 *.pem
+**/.idea/workspace.xml
+**/.idea/tasks.xml

@@ -17,13 +17,13 @@ class MasterStreamStrategy {
       marketDataFilter: {
         fields: ['EX_MARKET_DEF'],
       }
-    }
+    };
   }
 
   analyse(data) {
     //first image
     if (data.ct === 'SUB_IMAGE' || data.ct === 'RESUB_DELTA') {
-      log.info('read', { data, username: this.username, stream: this.stream, strategy: 'one' });
+      log.info('read', {data, username: this.username, stream: this.stream, strategy: 'one'});
       return;
     }
 
@@ -41,7 +41,7 @@ class MasterStreamStrategy {
         return {
           inPlay: (market.marketDefinition.status === 'OPEN'),
           market
-        }
+        };
       });
     }
   }

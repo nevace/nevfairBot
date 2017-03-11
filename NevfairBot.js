@@ -13,11 +13,11 @@ class NevfairBot {
   _init() {
     BetfairClient.login(this.credentials)
       .then(session => {
-        log.debug(session)
-        this.session = session
+        log.debug(session);
+        this.session = session;
         StreamFactory.init(this.credentials.appKey, this.session.token, this.strategies, this.credentials.username);
       })
-      .catch(err => log.error(err))
+      .catch(err => log.error(err));
   }
 }
 

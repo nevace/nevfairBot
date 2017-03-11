@@ -1,26 +1,35 @@
 const StreamBase = require('./StreamBase');
 
 class MarketStream extends StreamBase {
-  constructor(appKey, session, strategy, username, config) {
-    super(appKey, session, strategy, username)
-    this.strategyIns = new(require(`../strategies/${this.strategy.strategy}/MarketStreamStrategy`))(username, this.constructor.name, config);
+  constructor(appKey, session, strategy, username, market) {
+    super(appKey, session, strategy, username);
+    this.market = market;
+    this.strategyIns = new (require(`../strategies/${this.strategy.strategy}/MarketStreamStrategy`))(username, this.constructor.name, market);
   }
 
-  _subscribe() {
-    this._sendData(this.strategyIns.subscriptionConfig);
+  _handleErr(err) {
+    super._handleErr(err, {marketId: this.market.id});
+  }
+
+  _handleData(rawData) {
+    super._handleData(rawData, {marketId: this.market.id});
+  }
+
+  _handleSocketEnd() {
+    super._handleSocketEnd({marketId: this.market.id});
+  }
+
+  _handleSocketClose(hasErr) {
+    super._handleSocketClose(hasErr, {marketId: this.market.id});
+  }
+
+  _sendData(data) {
+    super._sendData(data, {marketId: this.market.id});
   }
 
   _passToStrategy(data) {
     this.strategyIns.analyse(data);
-
-    // if (marketChanges) {
-    //   for (let market of marketChanges) {
-    //     this.streams[market.id] = this.streams[market.id] || {};
-    //     this.streams[market.id].market = StreamFactory.createStream(this.appKey, this.session, 'market', this.strategy.strategy, this.username, market);
-    //   }
-    // }
   }
 }
-
 
 module.exports = MarketStream;
