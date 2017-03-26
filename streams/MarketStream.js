@@ -1,5 +1,8 @@
 const StreamBase = require('./StreamBase');
 
+/**
+ * @extends StreamBase
+ */
 class MarketStream extends StreamBase {
   constructor(appKey, session, strategy, username, market) {
     super(appKey, session, strategy, username);

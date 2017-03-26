@@ -98,7 +98,17 @@ class StreamBase {
     }
   }
 
+  /**
+   * @param {Object} data The data received from Betfair
+   * @param {string} data.ct The subscription type
+   * @param {string} data.op The type of operation
+   * @param {Object[]} data.mc The market changes
+   * @param {Object} data.mc.marketDefinition The market definition
+   * @param {boolean} data.mc.marketDefinition.inPlay If the Market is in-play
+   * @param {string} data.mc.marketDefinition.status The status of the market
+   */
   _passToStrategy(data) {
+    console.log(data);
   }
 
   _handleSocketEnd(meta = {}) {

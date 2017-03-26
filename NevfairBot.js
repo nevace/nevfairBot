@@ -1,12 +1,12 @@
 const BetfairClient = require('./BetfairClient');
 const StreamFactory = require('./streams/StreamFactory');
 const log = require('./log');
-// console.log(StreamFactory.createStream)
+
 class NevfairBot {
   constructor(credentials, strategies) {
     this.credentials = credentials;
     this.strategies = strategies;
-    this.session;
+    this.session = null;
     this._init();
   }
 

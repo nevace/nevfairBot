@@ -1,5 +1,8 @@
 const StreamBase = require('./StreamBase');
 
+/**
+ * @extends StreamBase
+ */
 class MasterStream extends StreamBase {
   constructor(appKey, session, strategy, username) {
     super(appKey, session, strategy, username);
