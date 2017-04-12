@@ -1,9 +1,12 @@
 const log = require('../../log');
+const MasterStrategyBase = require('../MasterStrategyBase');
 
-class MasterStreamStrategy {
-  constructor(username, stream) {
-    this.username = username;
-    this.stream = stream;
+/**
+ * @extends MasterStrategyBase
+ */
+class MasterStreamStrategy extends MasterStrategyBase {
+  constructor(username, stream, strategyName) {
+    super(username, stream, strategyName);
     this.subscriptionConfig = {
       op: 'marketSubscription',
       marketFilter: {
@@ -20,10 +23,15 @@ class MasterStreamStrategy {
     };
   }
 
+  /**
+   * @param data
+   * @description Returns object when a market has gone in play or has closed.
+   * @override
+   */
   analyse(data) {
     //first image
     if (data.ct === 'SUB_IMAGE' || data.ct === 'RESUB_DELTA') {
-      log.info('read', {data, username: this.username, stream: this.stream, strategy: 'one'});
+      log.info('read', {data, username: this.username, stream: this.stream, strategy: this.strategyName});
       return;
     }
 

@@ -7,7 +7,7 @@ class MarketStream extends StreamBase {
   constructor(appKey, session, strategy, username, market) {
     super(appKey, session, strategy, username);
     this.market = market;
-    this.strategyIns = new (require(`../strategies/${this.strategy.strategy}/MarketStreamStrategy`))(username, this.constructor.name, market);
+    this.strategyIns = new (require(`../strategies/${this.strategy.strategy}/MarketStreamStrategy`))(username, this.constructor.name, market, this.strategy.strategy);
   }
 
   _handleErr(err) {
@@ -30,7 +30,7 @@ class MarketStream extends StreamBase {
     super._sendData(data, {marketId: this.market.id});
   }
 
-  _passToStrategy(data) {
+  _processData(data) {
     this.strategyIns.analyse(data);
   }
 }

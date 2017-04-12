@@ -1,4 +1,8 @@
 const log = require('../../log');
+const MarketStrategyBase = require('../MarketStrategyBase');
+
+//adding back and lay specific timers and changing time to 3 secs
+
 
 //runners with bsp below BSP_THRESHOLD will need a price more than or equal
 //to LAY_PRICE_MIN and less than or equal to LAY_PRICE_MAX to trigger lay.
@@ -13,18 +17,21 @@ const LAY_PRICE_MIN = 20;
 const LAY_PRICE_MAX = 30;
 const PRICE_CHANGED_THRESHOLD = 1.1;
 const RED_OUT_THRESHOLD = 18;
-const PRICE_CHANGE_TIMER = 2000;
+const BACK_PRICE_CHANGE_TIMER = 3000;
+const LAY_PRICE_CHANGE_TIMER = 2000;
 
-class MarketStreamStrategy {
+/**
+ * @extends MarketStrategyBase
+ */
+class MarketStreamStrategy extends MarketStrategyBase {
   /**
    * @param username
    * @param streamName
    * @param market
+   * @param strategyName
    */
-  constructor(username, streamName, market) {
-    this.username = username;
-    this.stream = streamName;
-    this.market = market;
+  constructor(username, streamName, market, strategyName) {
+    super(username, streamName, market, strategyName);
     this.subscriptionConfig = {
       op: 'marketSubscription',
       marketFilter: {
@@ -35,19 +42,6 @@ class MarketStreamStrategy {
         ladderLevels: 1
       }
     };
-    this.runners = {};
-    this.debug = true;
-    this.stake = 250;
-    this.bank = 0;
-
-    for (let runner of market.marketDefinition.runners) {
-      this.runners[runner.id] = runner;
-      this.runners[runner.id].ladder = {
-        lay: [{price: null, size: null}],
-        back: [{price: null, size: null}]
-      };
-    }
-
   }
 
   /**
@@ -64,14 +58,14 @@ class MarketStreamStrategy {
 
     let redOutLoss = (cachedRunner.back.stake * (cachedRunner.back.price - 1)) - this.stake;
 
-    log.debug('place back bet', {
-      redOutLoss,
-      cachedRunner,
-      username: this.username,
-      stream: this.stream,
-      marketId: this.market.id,
-      strategy: 'one'
-    });
+    // log.debug('place back bet', {
+    //   redOutLoss,
+    //   cachedRunner,
+    //   username: this.username,
+    //   stream: this.stream,
+    //   marketId: this.market.id,
+    //   strategy: this.strategyName
+    // });
 
     if (this.debug) {
       this.bank -= cachedRunner.lay.stake;
@@ -82,7 +76,7 @@ class MarketStreamStrategy {
         username: this.username,
         stream: this.stream,
         marketId: this.market.id,
-        strategy: 'one'
+        strategy: this.strategyName
       });
     }
   }
@@ -97,14 +91,14 @@ class MarketStreamStrategy {
     cachedRunner.betOpen = true;
     cachedRunner.lay = {stake: win, price: cachedRunnerLayPrice};
 
-    log.debug('place lay bet', {
-      win,
-      cachedRunner,
-      username: this.username,
-      stream: this.stream,
-      marketId: this.market.id,
-      strategy: 'one'
-    });
+    // log.debug('place lay bet', {
+    //   win,
+    //   cachedRunner,
+    //   username: this.username,
+    //   stream: this.stream,
+    //   marketId: this.market.id,
+    //   strategy: this.strategyName
+    // });
 
     if (this.debug) {
       this.bank += win;
@@ -114,30 +108,9 @@ class MarketStreamStrategy {
         username: this.username,
         stream: this.stream,
         marketId: this.market.id,
-        strategy: 'one'
+        strategy: this.strategyName
       });
     }
-  }
-
-  /**
-   * @param runner
-   * @param cachedRunner
-   * @param type
-   * @private
-   */
-  _updateCache(runner, cachedRunner, type) {
-    const ladderData = (type === 'lay') ? runner.bdatl : runner.bdatb;
-    cachedRunner.ladder[type][0] = {
-      price: ladderData[0][1],
-      size: ladderData[0][2]
-    };
-
-    // log.debug('update cache', {
-    //   cachedRunner,
-    //   username: this.username,
-    //   stream: this.stream,
-    //   strategy: 'one'
-    // });
   }
 
   /**
@@ -148,10 +121,18 @@ class MarketStreamStrategy {
    * @private
    */
   _setTimer(cachedRunner, cachedRunnerPrice, orderType) {
-    if (cachedRunner.pendingOrder) return;
-    const operation = (orderType === 'lay') ? this._placeLayOrder : this._placeBackOrder;
+    let operation, timer;
 
-    cachedRunner.pendingOrder = setTimeout(operation.bind(this), PRICE_CHANGE_TIMER, cachedRunner, cachedRunnerPrice);
+    if (cachedRunner.pendingOrder) return;
+
+    if (orderType === 'lay') {
+      operation = this._placeLayOrder;
+      timer = LAY_PRICE_CHANGE_TIMER;
+    } else {
+      operation = this._placeBackOrder;
+      timer = BACK_PRICE_CHANGE_TIMER;
+    }
+    cachedRunner.pendingOrder = setTimeout(operation.bind(this), timer, cachedRunner, cachedRunnerPrice);
   }
 
   /**
@@ -168,8 +149,8 @@ class MarketStreamStrategy {
 
   /**
    * @param {Object} cachedRunner The cached Runner Object
-   * @description The logic to determine whether to place a back order.
    * @private
+   * @override
    */
   _backLogic(cachedRunner) {
     const cachedRunnerLayPrice = cachedRunner.ladder.lay[0].price;
@@ -185,8 +166,8 @@ class MarketStreamStrategy {
 
   /**
    * @param {Object} cachedRunner The cached Runner Object
-   * @description The logic to determine whether to place a lay order.
    * @private
+   * @override
    */
   _layLogic(cachedRunner) {
     const cachedRunnerLayPrice = cachedRunner.ladder.lay[0].price;
@@ -207,50 +188,6 @@ class MarketStreamStrategy {
     this._clearTimer(cachedRunner);
   }
 
-  /**
-   * @param data
-   */
-  analyse(data) {
-    //first image
-    if (data.ct === 'SUB_IMAGE' || data.ct === 'RESUB_DELTA') {
-      log.info('read', {
-        data,
-        username: this.username,
-        stream: this.stream,
-        marketId: this.market.id,
-        strategy: 'one'
-      });
-      return;
-    }
-
-    //changes - bot logic
-    if (data.op === 'mcm' && data.mc && data.mc.length) {
-      const runnerChanges = data.mc[0].rc;
-
-      for (let runner of runnerChanges) {
-        let cachedRunner = this.runners[runner.id];
-        // let laySize = cachedRunner.ladder.lay[0].size;
-        // let backSize = cachedRunner.ladder.back[0].size;
-
-        // update ladder lay cache if changed
-        if (runner.bdatl && runner.bdatl.length) {
-          this._updateCache(runner, cachedRunner, 'lay');
-        }
-
-        // update ladder back cache if changed
-        if (runner.bdatb && runner.bdatb.length) {
-          this._updateCache(runner, cachedRunner, 'back');
-        }
-
-        if (cachedRunner.betOpen) {
-          this._backLogic(cachedRunner);
-        } else {
-          this._layLogic(cachedRunner);
-        }
-      }
-      //log.debug('runner changes', { data: this.runners, username: this.username, stream: this.stream, strategy: 'one' });
-    }
-  }
 
 }
 

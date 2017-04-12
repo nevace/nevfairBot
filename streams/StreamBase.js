@@ -1,9 +1,11 @@
 const tls = require('tls');
 const randomId = require('random-id');
 const log = require('../log');
+const EventEmitter = require('events').EventEmitter;
 
-class StreamBase {
+class StreamBase extends EventEmitter {
   constructor(appKey, session, strategy, username) {
+    super();
     this.appKey = appKey;
     this.session = session;
     this.strategy = strategy;
@@ -18,9 +20,10 @@ class StreamBase {
   }
 
   _handleConnect(meta = {}) {
+    const subscriptionConfig = (this.strategyIns) ? this.strategyIns.subscriptionConfig : this.subscriptionConfig;
     log.debug('connected');
     this._authenticate(meta);
-    this._sendData(this.strategyIns.subscriptionConfig);
+    this._sendData(subscriptionConfig);
   }
 
   _authenticate(meta = {}) {
@@ -33,18 +36,8 @@ class StreamBase {
 
   _sendData(data, meta = {}) {
     data.id = parseInt(randomId(9, '0'));
-
-    const logData = {
-      data,
-      username: this.username,
-      stream: this.constructor.name,
-      strategy: this.strategy.strategy
-    };
-
-    Object.assign(logData, meta);
-
     this.stream.write(this._parseReq(data));
-    log.info('write', logData);
+    log.info('write', this._logData({data}, meta));
   }
 
   _parseReq(obj) {
@@ -52,16 +45,7 @@ class StreamBase {
   }
 
   _handleErr(err, meta = {}) {
-    const logData = {
-      error: err,
-      username: this.username,
-      stream: this.constructor.name,
-      strategy: this.strategy.strategy
-    };
-
-    Object.assign(logData, meta);
-
-    log.error('socket error', logData);
+    log.error('socket error', this._logData({error: err}, meta));
   }
 
   _handleData(rawData, meta = {}) {
@@ -73,23 +57,15 @@ class StreamBase {
 
       for (let jsonString of dataArr) {
         const data = JSON.parse(jsonString);
-        const logData = {
-          data,
-          username: this.username,
-          stream: this.constructor.name,
-          strategy: this.strategy.strategy
-        };
 
-        Object.assign(logData, meta);
-
-        this._passToStrategy(data);
+        this._processData(data);
 
         if (data.op === 'connection') {
-          log.info('read', logData);
+          log.info('read', this._logData({data}, meta));
         }
 
         if (data.statusCode === 'FAILURE') {
-          log.error('read', logData);
+          log.error('read', this._logData({data}, meta));
         }
 
       }
@@ -106,32 +82,32 @@ class StreamBase {
    * @param {Object} data.mc.marketDefinition The market definition
    * @param {boolean} data.mc.marketDefinition.inPlay If the Market is in-play
    * @param {string} data.mc.marketDefinition.status The status of the market
+   * @abstract
    */
-  _passToStrategy(data) {
+  _processData(data) {
     console.log(data);
   }
 
   _handleSocketEnd(meta = {}) {
-    const logData = {
-      username: this.username,
-      stream: this.constructor.name,
-      strategy: this.strategy.strategy
-    };
-
-    Object.assign(logData, meta);
-    log.debug('socket ended', logData);
+    log.debug('socket ended', this._logData(null, meta));
   }
 
   _handleSocketClose(hasErr, meta = {}) {
+    log.info('socket closed', this._logData({error: hasErr}, meta));
+  }
+
+  _logData(dataToMerge = {}, meta) {
     const logData = {
-      error: hasErr,
       username: this.username,
       stream: this.constructor.name,
-      strategy: this.strategy.strategy
     };
 
-    Object.assign(logData, meta);
-    log.info('socket closed', logData);
+    if (this.strategy) {
+      logData.strategy = this.strategy.strategy;
+    }
+
+    Object.assign(logData, dataToMerge, meta);
+    return logData;
   }
 
 }

@@ -6,12 +6,12 @@ const StreamBase = require('./StreamBase');
 class MasterStream extends StreamBase {
   constructor(appKey, session, strategy, username) {
     super(appKey, session, strategy, username);
-    this.strategyIns = new (require(`../strategies/${this.strategy.strategy}/MasterStreamStrategy`))(username, this.constructor.name);
+    this.strategyIns = new (require(`../strategies/${this.strategy.strategy}/MasterStreamStrategy`))(username, this.constructor.name, this.strategy.strategy);
     this.streams = {};
     this.StreamFactory = require('./StreamFactory');
   }
 
-  _passToStrategy(data) {
+  _processData(data) {
     const marketChanges = this.strategyIns.analyse(data);
 
     if (marketChanges) {
@@ -25,10 +25,6 @@ class MasterStream extends StreamBase {
           // log.debug('masterStream cache', { data: this.streams, username: this.username, stream: this.constructor.name, strategy: this.strategy.strategy });
         } else {
           if (this.streams[market.market.id]) {
-            //if debug, calculate PL
-            // if (this.streams[market.market.id].market.debug) {
-            //   this.streams[market.market.id].market.calculatePL();
-            // }
             this.streams[market.market.id].market.stream.end();
             this.streams[market.market.id].market = null;
             delete this.streams[market.market.id];
