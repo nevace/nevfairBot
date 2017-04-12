@@ -4,13 +4,14 @@ const fs = require('mz/fs');
 const https = require('https');
 const DB = require('./DB');
 const moment = require('moment');
+const BETFAIR_LOGIN = 'https://identitysso.betfair.com/api/certlogin/';
+const BETFAIR_API = 'https://api.betfair.com/exchange/betting/rest/v1.0/';
 
 class BetFairClient {
   constructor() {
     this.config = {
       headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Accept': 'application/json'
       },
       httpsAgent: new https.Agent({
         cert: fs.readFileSync('./client-2048.crt'),
@@ -23,28 +24,53 @@ class BetFairClient {
   login(credentials) {
     const {username, password, appKey} = credentials;
     this.config.headers['X-Application'] = appKey;
+    this.config.headers['Content-Type'] = 'application/x-www-form-urlencoded';
 
     return this._checkIfCurrentSession(username)
       .then(session => {
-        if (session) return session;
+        if (session) {
+          this.config.headers['Content-Type'] = 'application/json';
+          this.config.headers['X-Authentication'] = session.token;
+          return session;
+        }
         return this._doLogin(username, password);
       });
   }
 
-  _doLogin(username, password) {
-    let session;
+  placeOrder(marketId, orderParams) {
+    const {selectionId, side, size, price} = orderParams;
     return axios.post(
-      'https://identitysso.betfair.com/api/certlogin/',
-      querystring.stringify({username, password}),
+      `${BETFAIR_API}placeOrders/`,
+      {
+        marketId,
+        instructions: [{
+          selectionId,
+          side,
+          orderType: 'LIMIT',
+          limitOrder: {
+            size,
+            price,
+            persistenceType: 'PERSIST'
+          }
+        }]
+      },
       this.config
     )
+  }
 
+  _doLogin(username, password) {
+    let session;
+    return axios.post(BETFAIR_LOGIN, querystring.stringify({username, password}), this.config)
       .then(res => {
         session = {token: res.data.sessionToken, start: new Date()};
         return DB;
       })
       .then(db => db.collection('users').findOneAndUpdate({username}, {$set: {session}}))
-      .then(() => session);
+      .then(() => {
+        this.config.headers['Content-Type'] = 'application/json';
+        this.config.headers['X-Authentication'] = session.token;
+        return session
+      });
   }
 
   _checkIfCurrentSession(username) {

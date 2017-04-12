@@ -1,6 +1,7 @@
 const log = require('./../log');
+const EventEmitter = require('events').EventEmitter;
 
-class MasterStrategyBase {
+class MarketStrategyBase extends EventEmitter {
   /**
    * @param username
    * @param streamName
@@ -8,13 +9,14 @@ class MasterStrategyBase {
    * @param strategyName
    */
   constructor(username, streamName, market, strategyName) {
+    super();
     this.username = username;
     this.stream = streamName;
     this.strategyName = strategyName;
     this.market = market;
     this.runners = {};
     this.on(`${this.username}:orderData`, this._handleOrderData.bind(this));
-    this.debug = true;
+    this.debug = false;
     this.stake = 250;
     this.bank = 0;
 
@@ -121,4 +123,4 @@ class MasterStrategyBase {
 
 }
 
-module.exports = MasterStrategyBase;
+module.exports = MarketStrategyBase;

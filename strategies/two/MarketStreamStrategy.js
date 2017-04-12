@@ -1,8 +1,8 @@
 const log = require('../../log');
 const MarketStrategyBase = require('../MarketStrategyBase');
+const BetfairClient = require('../../BetfairClient');
 
 //adding back and lay specific timers and changing time to 3 secs
-
 
 //runners with bsp below BSP_THRESHOLD will need a price more than or equal
 //to LAY_PRICE_MIN and less than or equal to LAY_PRICE_MAX to trigger lay.
@@ -32,6 +32,12 @@ class MarketStreamStrategy extends MarketStrategyBase {
    */
   constructor(username, streamName, market, strategyName) {
     super(username, streamName, market, strategyName);
+    this.logData = {
+      username: this.username,
+      stream: this.stream,
+      marketId: this.market.id,
+      strategy: this.strategyName
+    };
     this.subscriptionConfig = {
       op: 'marketSubscription',
       marketFilter: {
@@ -87,31 +93,32 @@ class MarketStreamStrategy extends MarketStrategyBase {
    * @private
    */
   _placeLayOrder(cachedRunner, cachedRunnerLayPrice) {
-    const win = this.stake / (cachedRunnerLayPrice - 1);
+    const win = (this.stake / (cachedRunnerLayPrice - 1)).toFixed(2);
+    const orderParams = {
+      selectionId: cachedRunner.id,
+      side: 'LAY',
+      size: win,
+      price: cachedRunnerLayPrice
+    };
     cachedRunner.betOpen = true;
-    cachedRunner.lay = {stake: win, price: cachedRunnerLayPrice};
-
-    // log.debug('place lay bet', {
-    //   win,
-    //   cachedRunner,
-    //   username: this.username,
-    //   stream: this.stream,
-    //   marketId: this.market.id,
-    //   strategy: this.strategyName
-    // });
+    // cachedRunner.lay = {stake: win, price: cachedRunnerLayPrice};
 
     if (this.debug) {
       this.bank += win;
-
-      log.debug('bank', {
-        bank: this.bank,
-        username: this.username,
-        stream: this.stream,
-        marketId: this.market.id,
-        strategy: this.strategyName
-      });
+      log.debug('bank', Object.assign(this.logData, {bank: this.bank}));
+    } else {
+      BetfairClient.placeOrder(this.market.id, orderParams)
+        .then(res => {
+          if (res.data.status === 'FAILURE') {
+            log.error('place lay order', Object.assign(this.logData, res.data));
+            return;
+          }
+          log.info('place lay order', Object.assign(this.logData, res.data));
+        })
+        .catch(err => log.error('place lay order', Object.assign(this.logData, err.response.data || err.message)));
     }
   }
+
 
   /**
    * @param {Object} cachedRunner The cached Runner Object

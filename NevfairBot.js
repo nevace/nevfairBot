@@ -17,7 +17,7 @@ class NevfairBot {
         this.session = session;
         StreamFactory.init(this.credentials.appKey, this.session.token, this.strategies, this.credentials.username);
       })
-      .catch(err => log.error(err));
+      .catch(err => log.error('betfair api error', err.response.data || err.message));
   }
 }
 
