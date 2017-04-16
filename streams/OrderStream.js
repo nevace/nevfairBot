@@ -1,8 +1,9 @@
 const StreamBase = require('./StreamBase');
+const event = require('./../event');
 
 class OrderStream extends StreamBase {
 
-  constructor(appKey, session, strategy, username, market) {
+  constructor(appKey, session, strategy, username) {
     super(appKey, session, strategy, username);
     this.subscriptionConfig = {
       op: 'orderSubscription'
@@ -10,7 +11,7 @@ class OrderStream extends StreamBase {
   }
 
   _processData(data) {
-    this.emit(`${this.username}:orderData`, data);
+    event.emit(`${this.username}:orderData`, data);
   }
 
 }

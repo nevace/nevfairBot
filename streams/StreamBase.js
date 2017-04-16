@@ -1,11 +1,9 @@
 const tls = require('tls');
 const randomId = require('random-id');
 const log = require('../log');
-const EventEmitter = require('events').EventEmitter;
 
-class StreamBase extends EventEmitter {
+class StreamBase {
   constructor(appKey, session, strategy, username) {
-    super();
     this.appKey = appKey;
     this.session = session;
     this.strategy = strategy;

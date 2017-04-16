@@ -32,6 +32,7 @@ class MarketStreamStrategy extends MarketStrategyBase {
    */
   constructor(username, streamName, market, strategyName) {
     super(username, streamName, market, strategyName);
+    this.stake = 2.5;
     this.logData = {
       username: this.username,
       stream: this.stream,
@@ -56,36 +57,29 @@ class MarketStreamStrategy extends MarketStrategyBase {
    * @private
    */
   _placeBackOrder(cachedRunner, cachedRunnerBackPrice) {
-    cachedRunner.betOpen = false;
-    cachedRunner.back = {
-      stake: (cachedRunner.lay.price / cachedRunnerBackPrice) * cachedRunner.lay.stake,
+    const redOutLoss = (cachedRunner.back.stake * (cachedRunner.back.price - 1)) - this.stake;
+    const orderParams = {
+      selectionId: cachedRunner.id,
+      side: 'BACK',
+      size: parseFloat(redOutLoss.toFixed(2)),
       price: cachedRunnerBackPrice
     };
-
-    let redOutLoss = (cachedRunner.back.stake * (cachedRunner.back.price - 1)) - this.stake;
-
-    // log.debug('place back bet', {
-    //   redOutLoss,
-    //   cachedRunner,
-    //   username: this.username,
-    //   stream: this.stream,
-    //   marketId: this.market.id,
-    //   strategy: this.strategyName
-    // });
+    cachedRunner.betOpen = false;
+    // cachedRunner.back = {
+    //   stake: (cachedRunner.lay.price / cachedRunnerBackPrice) * cachedRunner.lay.stake,
+    //   price: cachedRunnerBackPrice
+    // };
 
     if (this.debug) {
       this.bank -= cachedRunner.lay.stake;
       this.bank += redOutLoss;
-
-      log.debug('bank', {
-        bank: this.bank,
-        username: this.username,
-        stream: this.stream,
-        marketId: this.market.id,
-        strategy: this.strategyName
-      });
+      log.debug('bank', Object.assign(this.logData, {bank: this.bank}));
+      return;
     }
+
+    BetfairClient.placeOrder(this.market.id, orderParams, this.logData);
   }
+
 
   /**
    * @param cachedRunner
@@ -93,11 +87,11 @@ class MarketStreamStrategy extends MarketStrategyBase {
    * @private
    */
   _placeLayOrder(cachedRunner, cachedRunnerLayPrice) {
-    const win = (this.stake / (cachedRunnerLayPrice - 1)).toFixed(2);
+    const win = (this.stake / (cachedRunnerLayPrice - 1));
     const orderParams = {
       selectionId: cachedRunner.id,
       side: 'LAY',
-      size: win,
+      size: parseFloat(win.toFixed(2)),
       price: cachedRunnerLayPrice
     };
     cachedRunner.betOpen = true;
@@ -106,19 +100,11 @@ class MarketStreamStrategy extends MarketStrategyBase {
     if (this.debug) {
       this.bank += win;
       log.debug('bank', Object.assign(this.logData, {bank: this.bank}));
-    } else {
-      BetfairClient.placeOrder(this.market.id, orderParams)
-        .then(res => {
-          if (res.data.status === 'FAILURE') {
-            log.error('place lay order', Object.assign(this.logData, res.data));
-            return;
-          }
-          log.info('place lay order', Object.assign(this.logData, res.data));
-        })
-        .catch(err => log.error('place lay order', Object.assign(this.logData, err.response.data || err.message)));
+      return;
     }
-  }
 
+    BetfairClient.placeOrder(this.market.id, orderParams, this.logData);
+  }
 
   /**
    * @param {Object} cachedRunner The cached Runner Object
@@ -152,6 +138,20 @@ class MarketStreamStrategy extends MarketStrategyBase {
     // log.debug('timeout cancelled', cachedRunner);
     clearTimeout(cachedRunner.pendingOrder);
     cachedRunner.pendingOrder = null;
+  }
+
+  /**
+   * @param {Object} cachedRunner The cached Runner Object
+   * @private
+   * @override
+   */
+  _applyBackLayLogic(cachedRunner) {
+    // if (cachedRunner.orders.ml && cachedRunner.orders.ml.length) {
+    //   this._backLogic(cachedRunner);
+    // }
+    // else {
+    this._layLogic(cachedRunner);
+    // }
   }
 
   /**

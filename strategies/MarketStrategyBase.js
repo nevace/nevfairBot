@@ -1,7 +1,7 @@
 const log = require('./../log');
-const EventEmitter = require('events').EventEmitter;
+const event = require('../event');
 
-class MarketStrategyBase extends EventEmitter {
+class MarketStrategyBase {
   /**
    * @param username
    * @param streamName
@@ -9,16 +9,14 @@ class MarketStrategyBase extends EventEmitter {
    * @param strategyName
    */
   constructor(username, streamName, market, strategyName) {
-    super();
     this.username = username;
     this.stream = streamName;
     this.strategyName = strategyName;
     this.market = market;
     this.runners = {};
-    this.on(`${this.username}:orderData`, this._handleOrderData.bind(this));
     this.debug = false;
-    this.stake = 250;
     this.bank = 0;
+    event.on(`${this.username}:orderData`, this._handleOrderData.bind(this));
 
     for (let runner of market.marketDefinition.runners) {
       this.runners[runner.id] = runner;
@@ -26,16 +24,22 @@ class MarketStrategyBase extends EventEmitter {
         lay: [{price: null, size: null}],
         back: [{price: null, size: null}]
       };
+      this.runners[runner.id].orders = {};
     }
   }
 
   _handleOrderData(data) {
-    log.debug('handleOrderData', {
-      data,
-      username: this.username,
-      stream: this.stream,
-      strategy: this.strategyName
-    });
+    if (data.op === 'ocm' && data.oc && data.oc.length) {
+      for (let market of data.oc) {
+        if (market.id === this.market.id) {
+          for (let orderChanges of market.orc) {
+            this.runners[orderChanges.id].orders = orderChanges;
+            log.debug('runnerCache change', Object.assign(this.logData, this.runners[orderChanges.id]));
+          }
+          break;
+        }
+      }
+    }
   }
 
   /**
@@ -78,6 +82,16 @@ class MarketStrategyBase extends EventEmitter {
   }
 
   /**
+   * @param {Object} cachedRunner The cached Runner Object
+   * @description When to apply the Back and Lay Logic methods.
+   * @private
+   * @abstract
+   */
+  _applyBackLayLogic(cachedRunner) {
+
+  }
+
+  /**
    * @param data
    */
   analyse(data) {
@@ -99,8 +113,6 @@ class MarketStrategyBase extends EventEmitter {
 
       for (let runner of runnerChanges) {
         let cachedRunner = this.runners[runner.id];
-        // let laySize = cachedRunner.ladder.lay[0].size;
-        // let backSize = cachedRunner.ladder.back[0].size;
 
         // update ladder lay cache if changed
         if (runner.bdatl && runner.bdatl.length) {
@@ -112,11 +124,7 @@ class MarketStrategyBase extends EventEmitter {
           this._updateCache(runner, cachedRunner, 'back');
         }
 
-        if (cachedRunner.betOpen) {
-          this._backLogic(cachedRunner);
-        } else {
-          this._layLogic(cachedRunner);
-        }
+        this._applyBackLayLogic(cachedRunner);
       }
     }
   }

@@ -15,7 +15,7 @@ class MasterStreamStrategy extends MasterStrategyBase {
         eventTypeIds: ['7'],
         turnInPlayEnabled: true,
         marketTypes: ['WIN'],
-        countryCodes: ['GB', 'IE']
+        // countryCodes: ['GB', 'IE']
       },
       marketDataFilter: {
         fields: ['EX_MARKET_DEF'],
@@ -37,7 +37,7 @@ class MasterStreamStrategy extends MasterStrategyBase {
 
     //changes
     if (data.op === 'mcm' && data.mc && data.mc.length) {
-      //log.debug('masterStream data', { data, username: this.username, stream: this.stream });
+      // log.debug('masterStream data', {data, username: this.username, stream: this.stream});
       const marketsOpeningOrClosing = data.mc.filter(market => {
         return (market.marketDefinition.inPlay && market.marketDefinition.status === 'OPEN') ||
           (market.marketDefinition.inPlay && market.marketDefinition.status === 'CLOSED');

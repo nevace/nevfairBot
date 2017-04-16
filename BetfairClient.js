@@ -4,6 +4,9 @@ const fs = require('mz/fs');
 const https = require('https');
 const DB = require('./DB');
 const moment = require('moment');
+const clone = require('clone');
+const merge = require('deepmerge');
+const log = require('./log');
 const BETFAIR_LOGIN = 'https://identitysso.betfair.com/api/certlogin/';
 const BETFAIR_API = 'https://api.betfair.com/exchange/betting/rest/v1.0/';
 
@@ -37,25 +40,95 @@ class BetFairClient {
       });
   }
 
-  placeOrder(marketId, orderParams) {
+  placeOrder(marketId, orderParams, logData) {
+
+    if (orderParams.size < 2) {
+      return this._placeOrderMin(marketId, orderParams, logData);
+    }
+
+    return this._doPlaceOrder(marketId, orderParams, logData);
+  }
+
+  cancelOrder(marketId, cancelOrderParams, logData) {
+    const {sizeReduction, betId} = cancelOrderParams;
+    const params = {marketId, instructions: [{betId, sizeReduction}]};
+
+    if (!betId) throw new Error('betId is null');
+
+    return axios.post(`${BETFAIR_API}cancelOrders/`, params, this.config)
+      .then(res => this._handleOrderRes(false, res, logData, `cancel order`))
+      .catch(err => this._handleOrderRes(true, err, logData, `cancel order`));
+  }
+
+  replaceOrder(marketId, replaceOrderParams, logData) {
+    const {newPrice, betId} = replaceOrderParams;
+    const params = {marketId, instructions: [{betId, newPrice}]};
+
+    if (!betId) throw new Error('betId is null');
+
+    return axios.post(`${BETFAIR_API}replaceOrders/`, params, this.config)
+      .then(res => this._handleOrderRes(false, res, logData, `replace order`))
+      .catch(err => this._handleOrderRes(true, err, logData, `replace order`));
+  }
+
+  _placeOrderMin(marketId, orderParams, logData) {
+    const minOrderParams = clone(orderParams);
+    const {price, side} = orderParams;
+    let betId;
+    minOrderParams.size += 2;
+    minOrderParams.price = (side === 'BACK') ? 1000 : 1.01;
+
+    return this._doPlaceOrder(marketId, minOrderParams, logData)
+      .then(res => {
+        betId = res.instructionReports[0].betId;
+        return this.cancelOrder(marketId, {sizeReduction: 2, betId}, logData);
+      })
+      .then(res => this.replaceOrder(marketId, {newPrice: price, betId}, logData))
+      .catch(err => this._handleOrderRes(true, err, logData, `place ${side.toLowerCase()} order:_placeOrderMin`));
+  }
+
+  /**
+   * @param {Boolean} err The error response
+   * @param {Object} res The response Object
+   * @param {Object} logData Context specific log data to merge with responses
+   * @param {String} logMessage The message to show in the logs
+   * @description
+   * @private
+   */
+  _handleOrderRes(err, res, logData, logMessage) {
+    if (err) {
+      let error = (res.response) ? res.response.data : res.data || res.message || res;
+      error = (typeof error === 'string') ? {error} : error;
+      log.error(logMessage, merge(logData, error, {clone: true}));
+      return error;
+    }
+    if (res.data.status === 'FAILURE') {
+      // log.error(logMessage, Object.assign(logData, res.data));
+      throw res;
+    }
+    log.info(logMessage, merge(logData, res.data, {clone: true}));
+    return res.data;
+  }
+
+  _doPlaceOrder(marketId, orderParams, logData) {
     const {selectionId, side, size, price} = orderParams;
-    return axios.post(
-      `${BETFAIR_API}placeOrders/`,
-      {
-        marketId,
-        instructions: [{
-          selectionId,
-          side,
-          orderType: 'LIMIT',
-          limitOrder: {
-            size,
-            price,
-            persistenceType: 'PERSIST'
-          }
-        }]
-      },
-      this.config
-    )
+    const params = {
+      marketId,
+      instructions: [{
+        selectionId,
+        side,
+        orderType: 'LIMIT',
+        limitOrder: {
+          size,
+          price,
+          persistenceType: 'PERSIST'
+        }
+      }]
+    };
+
+    return axios.post(`${BETFAIR_API}placeOrders/`, params, this.config)
+      .then(res => this._handleOrderRes(false, res, logData, `place ${side.toLowerCase()} order:_doPlaceOrder`))
+      .catch(err => this._handleOrderRes(true, err, logData, `place ${side.toLowerCase()} order:_doPlaceOrder`));
   }
 
   _doLogin(username, password) {
