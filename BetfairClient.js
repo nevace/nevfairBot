@@ -5,7 +5,6 @@ const https = require('https');
 const DB = require('./DB');
 const moment = require('moment');
 const clone = require('clone');
-const merge = require('deepmerge');
 const log = require('./log');
 const BETFAIR_LOGIN = 'https://identitysso.betfair.com/api/certlogin/';
 const BETFAIR_API = 'https://api.betfair.com/exchange/betting/rest/v1.0/';
@@ -99,14 +98,14 @@ class BetFairClient {
     if (err) {
       let error = (res.response) ? res.response.data : res.data || res.message || res;
       error = (typeof error === 'string') ? {error} : error;
-      log.error(logMessage, merge(logData, error, {clone: true}));
+      log.error(logMessage, Object.assign({}, logData, error));
       return error;
     }
     if (res.data.status === 'FAILURE') {
       // log.error(logMessage, Object.assign(logData, res.data));
       throw res;
     }
-    log.info(logMessage, merge(logData, res.data, {clone: true}));
+    log.info(logMessage, Object.assign({}, logData, res.data));
     return res.data;
   }
 

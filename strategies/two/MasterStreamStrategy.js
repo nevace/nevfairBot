@@ -15,7 +15,7 @@ class MasterStreamStrategy extends MasterStrategyBase {
         eventTypeIds: ['7'],
         turnInPlayEnabled: true,
         marketTypes: ['WIN'],
-        // countryCodes: ['GB', 'IE']
+        countryCodes: ['GB', 'IE']
       },
       marketDataFilter: {
         fields: ['EX_MARKET_DEF'],
@@ -31,7 +31,11 @@ class MasterStreamStrategy extends MasterStrategyBase {
   analyse(data) {
     //first image
     if (data.ct === 'SUB_IMAGE' || data.ct === 'RESUB_DELTA') {
-      log.info('read', {data, username: this.username, stream: this.stream, strategy: this.strategyName});
+      log.info('read', Object.assign(data, {
+        username: this.username,
+        stream: this.stream,
+        strategy: this.strategyName
+      }));
       return;
     }
 

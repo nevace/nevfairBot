@@ -35,7 +35,7 @@ class StreamBase {
   _sendData(data, meta = {}) {
     data.id = parseInt(randomId(9, '0'));
     this.stream.write(this._parseReq(data));
-    log.info('write', this._logData({data}, meta));
+    log.info('write', this._logData(data, meta));
   }
 
   _parseReq(obj) {
@@ -59,11 +59,11 @@ class StreamBase {
         this._processData(data);
 
         if (data.op === 'connection') {
-          log.info('read', this._logData({data}, meta));
+          log.info('read', this._logData(data, meta));
         }
 
         if (data.statusCode === 'FAILURE') {
-          log.error('read', this._logData({data}, meta));
+          log.error('read', this._logData(data, meta));
         }
 
       }

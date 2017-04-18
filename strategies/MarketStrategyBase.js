@@ -29,12 +29,30 @@ class MarketStrategyBase {
   }
 
   _handleOrderData(data) {
+    //first image
+    if (data.ct === 'SUB_IMAGE' || data.ct === 'RESUB_DELTA') {
+      log.info('read', Object.assign(data, this.logData));
+      return;
+    }
+
     if (data.op === 'ocm' && data.oc && data.oc.length) {
       for (let market of data.oc) {
-        if (market.id === this.market.id) {
+        if (market.id === this.market.id && market.orc) {
           for (let orderChanges of market.orc) {
-            this.runners[orderChanges.id].orders = orderChanges;
-            log.debug('runnerCache change', Object.assign(this.logData, this.runners[orderChanges.id]));
+            if (orderChanges.uo && orderChanges.uo.length) {
+              for (let unmatchedOrder of orderChanges.uo) {
+                if (this.runners[orderChanges.id].orders[unmatchedOrder.id]) {
+                  var redOutStatus = this.runners[orderChanges.id].orders[unmatchedOrder.id].redout;
+                  console.log('redoutStatus', redOutStatus);
+                }
+                this.runners[orderChanges.id].orders[unmatchedOrder.id] = unmatchedOrder;
+                this.runners[orderChanges.id].orders[unmatchedOrder.id].redout = redOutStatus;
+                if (this.runners[orderChanges.id].orders[unmatchedOrder.id].sc !== 0) {
+                  delete this.runners[orderChanges.id].orders[unmatchedOrder.id];
+                }
+              }
+            }
+            log.debug('runnerCache change', Object.assign({}, this.logData, this.runners[orderChanges.id]));
           }
           break;
         }
@@ -54,13 +72,6 @@ class MarketStrategyBase {
       price: ladderData[0][1],
       size: ladderData[0][2]
     };
-
-    // log.debug('update cache', {
-    //   cachedRunner,
-    //   username: this.username,
-    //   stream: this.stream,
-    //   strategy: this.strategyName
-    // });
   }
 
   /**
@@ -97,13 +108,7 @@ class MarketStrategyBase {
   analyse(data) {
     //first image
     if (data.ct === 'SUB_IMAGE' || data.ct === 'RESUB_DELTA') {
-      log.info('read', {
-        data,
-        username: this.username,
-        stream: this.stream,
-        marketId: this.market.id,
-        strategy: this.strategyName
-      });
+      log.info('read', Object.assign(data, this.logData));
       return;
     }
 
