@@ -49,6 +49,12 @@ class MarketStreamStrategy extends MarketStrategyBase {
         ladderLevels: 1
       }
     };
+    //remove first and second favourite
+    // for (let i = 0; i < 2; i++) {
+    //   this.runners[Object.keys(this.runners)[i]] = null;
+    //   delete this.runners[Object.keys(this.runners)[i]];
+    // }
+
   }
 
   /**

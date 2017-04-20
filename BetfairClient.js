@@ -7,6 +7,7 @@ const moment = require('moment');
 const clone = require('clone');
 const log = require('./log');
 const BETFAIR_LOGIN = 'https://identitysso.betfair.com/api/certlogin/';
+const BETFAIR_KEEPALIVE = 'https://identitysso.betfair.com/api/keepAlive';
 const BETFAIR_API = 'https://api.betfair.com/exchange/betting/rest/v1.0/';
 
 class BetFairClient {
@@ -31,8 +32,10 @@ class BetFairClient {
     return this._checkIfCurrentSession(username)
       .then(session => {
         if (session) {
+          const lastSessionTimeDiff = moment().diff(session.start, 'hours', true);
           this.config.headers['Content-Type'] = 'application/json';
           this.config.headers['X-Authentication'] = session.token;
+          this._keepAlive(lastSessionTimeDiff, username);
           return session;
         }
         return this._doLogin(username, password);
@@ -109,6 +112,23 @@ class BetFairClient {
     return res.data;
   }
 
+  _keepAlive(lastSessionTimeDiff, username) {
+    let i = 0;
+    let interval = (lastSessionTimeDiff) ? 3.5 - lastSessionTimeDiff : 3.5;
+
+    setInterval(() => {
+      if (interval !== 3.5 && i === 1) {
+        interval = 3.5
+      }
+      if (i < 1) {
+        i++;
+      }
+      axios.post(BETFAIR_KEEPALIVE, {}, this.config)
+        .then(res => log.debug('keepalive', {username}))
+        .catch(err => log.error('keepalive error', err.data || err.message))
+    }, interval * 60 * 60 * 1000);
+  }
+
   _doPlaceOrder(marketId, orderParams, logData) {
     const {selectionId, side, size, price} = orderParams;
     const params = {
@@ -141,6 +161,7 @@ class BetFairClient {
       .then(() => {
         this.config.headers['Content-Type'] = 'application/json';
         this.config.headers['X-Authentication'] = session.token;
+        this._keepAlive(null, username);
         return session
       });
   }

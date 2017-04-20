@@ -17,6 +17,7 @@ class MarketStrategyBase {
     this.debug = false;
     this.bank = 0;
     event.on(`${this.username}:orderData`, this._handleOrderData.bind(this));
+    // market.marketDefinition.runners = market.marketDefinition.runners.sort((a, b) => a.bsp - b.bsp);
 
     for (let runner of market.marketDefinition.runners) {
       this.runners[runner.id] = runner;
