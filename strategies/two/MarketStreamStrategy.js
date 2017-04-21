@@ -11,7 +11,7 @@ const BetfairClient = require('../../BetfairClient');
 //PRICE_CHANGED_THRESHOLD and be less than or equal to LAY_PRICE_MAX to trigger lay
 
 //runners with open lay bets and price equal to or below
-//RED_OUT_THRESHOLD will trigger back back to red out
+//RED_OUT_THRESHOLD will trigger back to red out
 const BSP_THRESHOLD = 20;
 const LAY_PRICE_MIN = 20;
 const LAY_PRICE_MAX = 30;
