@@ -16,6 +16,7 @@ class MasterStreamStrategy extends MasterStrategyBase {
         turnInPlayEnabled: true,
         marketTypes: ['WIN'],
         countryCodes: ['GB', 'IE']
+        // countryCodes: ['AU']
       },
       marketDataFilter: {
         fields: ['EX_MARKET_DEF'],

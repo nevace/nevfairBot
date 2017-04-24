@@ -14,11 +14,21 @@ const BetfairClient = require('../../BetfairClient');
 //RED_OUT_THRESHOLD will trigger back to red out
 const BSP_THRESHOLD = 20;
 const LAY_PRICE_MIN = 20;
-const LAY_PRICE_MAX = 30;
+const LAY_PRICE_MAX = 50;
 const PRICE_CHANGED_THRESHOLD = 1.1;
-const RED_OUT_THRESHOLD = 18;
-const BACK_PRICE_CHANGE_TIMER = 3000;
-const LAY_PRICE_CHANGE_TIMER = 2000;
+const BACK_PRICE_CHANGE_TIMER = 1000;
+const LAY_PRICE_CHANGE_TIMER = 1;
+
+const RED_OUT_THRESHOLD = 0.5;
+const LAY_PRICE_BOUNDARY1_START = 20;
+const LAY_PRICE_BOUNDARY1_END = 29;
+const LAY_PRICE_BOUNDARY1_THRESHOLD = 1.2;
+const LAY_PRICE_BOUNDARY2_START = 30;
+const LAY_PRICE_BOUNDARY2_END = 39;
+const LAY_PRICE_BOUNDARY2_THRESHOLD = 1.14;
+const LAY_PRICE_BOUNDARY3_START = 40;
+const LAY_PRICE_BOUNDARY3_END = 45;
+const LAY_PRICE_BOUNDARY3_THRESHOLD = 1.1;
 
 /**
  * @extends MarketStrategyBase
@@ -49,11 +59,45 @@ class MarketStreamStrategy extends MarketStrategyBase {
         ladderLevels: 1
       }
     };
-    //remove first and second favourite
-    // for (let i = 0; i < 2; i++) {
-    //   this.runners[Object.keys(this.runners)[i]] = null;
-    //   delete this.runners[Object.keys(this.runners)[i]];
-    // }
+
+    //sort by bsp and remove 1st - 3rd fav and any with bsp less than 20
+    this.market.marketDefinition.runners = this.market.marketDefinition.runners.sort((a, b) => a.bsp - b.bsp);
+    this.market.marketDefinition.runners.splice(0, 3);
+
+    for (let i = this.market.marketDefinition.runners.length - 1; i >= 0; i--) {
+      if (this.market.marketDefinition.runners[i].bsp < 20 || !this.market.marketDefinition.runners[i].bsp) {
+        this.market.marketDefinition.runners.splice(i, 1);
+      }
+    }
+    console.log('runners', this.market.marketDefinition.runners);
+    //build runner cache
+    for (let runner of this.market.marketDefinition.runners) {
+      this.runners[runner.id] = runner;
+      this.runners[runner.id].ladder = {
+        lay: {
+          previous: {
+            price: null,
+            size: null
+          },
+          current: {
+            price: null,
+            size: null
+          }
+        },
+        back: {
+          previous: {
+            price: null,
+            size: null
+          },
+          current: {
+            price: null,
+            size: null
+          }
+        }
+      };
+      this.runners[runner.id].orders = {};
+    }
+
 
   }
 
@@ -62,36 +106,36 @@ class MarketStreamStrategy extends MarketStrategyBase {
    * @param cachedRunnerBackPrice
    * @private
    */
-  _placeBackOrder(cachedRunner, cachedRunnerBackPrice) {
-    for (let order of Object.keys(cachedRunner.orders)) {
-      if (cachedRunner.orders[order].side === 'L' && !cachedRunner.orders[order].redout) {
-        const redOutLoss = (cachedRunner.orders[order].avp / cachedRunnerBackPrice) * cachedRunner.orders[order].s;
-        cachedRunner.orders[order].redout = true;
-        const orderParams = {
-          selectionId: cachedRunner.id,
-          side: 'BACK',
-          size: Math.round(redOutLoss * 1e2) / 1e2,
-          price: cachedRunnerBackPrice
-        };
+  _placeBackOrder(cachedRunner, order, cachedRunnerBackPrice) {
+    const redOutLoss = (cachedRunner.orders[order].avp / cachedRunnerBackPrice) * cachedRunner.orders[order].s;
+    const roundedLoss = Math.round(redOutLoss * 1e2) / 1e2;
+    console.log('back size', redOutLoss, roundedLoss);
+    cachedRunner.orders[order].redout = true;
+    const orderParams = {
+      selectionId: cachedRunner.id,
+      side: 'BACK',
+      size: roundedLoss,
+      price: 1.01
+    };
 
-        if (this.debug) {
-          this.bank -= cachedRunner.lay.stake;
-          this.bank += redOutLoss;
-          log.debug('bank', Object.assign({}, this.logData, {bank: this.bank}));
-          return;
-        }
-
-        BetfairClient.placeOrder(this.market.id, orderParams, this.logData)
-          .then(res => {
-            if (res.status === 'SUCCESS') {
-              cachedRunner.betOpen = false;
-            } else {
-              cachedRunner.orders[order].redout = false;
-            }
-          })
-          .catch(err => log.error('BetfairClient.placeBackOrder', Object.assign({}, err, this.logData)));
-      }
+    if (this.debug) {
+      this.bank -= cachedRunner.lay.stake;
+      this.bank += roundedLoss;
+      log.debug('bank', Object.assign({}, this.logData, {bank: this.bank}));
+      return;
     }
+
+    BetfairClient.placeOrder(this.market.id, orderParams, this.logData)
+      .then(res => {
+        if (res.status === 'SUCCESS') {
+          cachedRunner.betOpen = false;
+        } else {
+          cachedRunner.orders[order].redout = false;
+          // cachedRunner.pendingOrder = null;
+        }
+      })
+      .catch(err => log.error('BetfairClient.placeBackOrder', Object.assign({}, err, this.logData)));
+
   }
 
 
@@ -102,13 +146,14 @@ class MarketStreamStrategy extends MarketStrategyBase {
    */
   _placeLayOrder(cachedRunner, cachedRunnerLayPrice) {
     const win = (this.stake / (cachedRunnerLayPrice - 1));
+    const roundedWin = Math.round(win * 1e2) / 1e2;
     const orderParams = {
       selectionId: cachedRunner.id,
       side: 'LAY',
-      size: Math.round(win * 1e2) / 1e2,
+      size: roundedWin,
       price: cachedRunnerLayPrice
     };
-
+    console.log('lay size', win, roundedWin);
     if (this.debug) {
       this.bank += win;
       log.debug('bank', Object.assign({}, this.logData, {bank: this.bank}));
@@ -178,15 +223,24 @@ class MarketStreamStrategy extends MarketStrategyBase {
    * @override
    */
   _backLogic(cachedRunner) {
-    const cachedRunnerLayPrice = cachedRunner.ladder.lay[0].price;
-    const cachedRunnerBackPrice = cachedRunner.ladder.back[0].price;
+    const cachedRunnerCurLayPrice = cachedRunner.ladder.lay.current.price;
+    const cachedRunnerCurBackPrice = cachedRunner.ladder.back.current.price;
+    const averagePriceLayed = cachedRunner;
 
-    //if SP is >= 20
-    if (cachedRunnerLayPrice <= RED_OUT_THRESHOLD && cachedRunnerBackPrice < cachedRunnerLayPrice) {
-      this._setTimer(cachedRunner, cachedRunnerBackPrice, 'back');
-      return;
+    for (let order of Object.keys(cachedRunner.orders)) {
+
+      if (cachedRunner.orders[order].side === 'L' && !cachedRunner.orders[order].redout) {
+
+        if ((cachedRunnerCurLayPrice / cachedRunner.orders[order].avp) <= RED_OUT_THRESHOLD &&
+          cachedRunnerCurBackPrice < cachedRunnerCurLayPrice) {
+          this._placeBackOrder(cachedRunner, order, cachedRunnerCurLayPrice);
+          // this._setTimer(cachedRunner, cachedRunnerBackPrice, 'back');
+          return;
+        }
+
+      }
+      // this._clearTimer(cachedRunner);
     }
-    this._clearTimer(cachedRunner);
   }
 
   /**
@@ -195,25 +249,47 @@ class MarketStreamStrategy extends MarketStrategyBase {
    * @override
    */
   _layLogic(cachedRunner) {
-    const cachedRunnerLayPrice = cachedRunner.ladder.lay[0].price;
-    //the SP is >= 20 and the lay price is >= 10% above SP but <=30
-    if (cachedRunner.bsp >= BSP_THRESHOLD) {
-      if (cachedRunnerLayPrice <= LAY_PRICE_MAX && ((cachedRunnerLayPrice / cachedRunner.bsp) >= PRICE_CHANGED_THRESHOLD)) {
-        this._setTimer(cachedRunner, cachedRunnerLayPrice, 'lay');
+    const cachedRunnerPrevLayPrice = cachedRunner.ladder.lay.previous.price;
+    const cachedRunnerCurLayPrice = cachedRunner.ladder.lay.current.price;
+
+    if (cachedRunnerCurLayPrice <= LAY_PRICE_MAX && cachedRunnerCurLayPrice >= LAY_PRICE_MIN) {
+      //Lay when they drift 20% between 20's and 29
+      if (cachedRunnerPrevLayPrice >= LAY_PRICE_BOUNDARY1_START &&
+        cachedRunnerPrevLayPrice <= LAY_PRICE_BOUNDARY1_END &&
+        (cachedRunnerCurLayPrice / cachedRunnerPrevLayPrice) >= LAY_PRICE_BOUNDARY1_THRESHOLD) {
+        console.log('layLogic', cachedRunnerPrevLayPrice, cachedRunnerCurLayPrice);
+
+        this._placeLayOrder(cachedRunner, cachedRunnerCurLayPrice);
+        // this._setTimer(cachedRunner, cachedRunnerCurLayPrice, 'lay');
         return;
       }
-    } else {
-      //the SP is < 20 and the lay price is >= 20 but <= 30
-      if (cachedRunnerLayPrice >= LAY_PRICE_MIN && cachedRunnerLayPrice <= LAY_PRICE_MAX) {
-        this._setTimer(cachedRunner, cachedRunnerLayPrice, 'lay');
+      //Lay when they drift 14% between 30's and 39
+      if (cachedRunnerPrevLayPrice >= LAY_PRICE_BOUNDARY2_START &&
+        cachedRunnerPrevLayPrice <= LAY_PRICE_BOUNDARY2_END &&
+        (cachedRunnerCurLayPrice / cachedRunnerPrevLayPrice) >= LAY_PRICE_BOUNDARY2_THRESHOLD) {
+        console.log('layLogic', cachedRunnerPrevLayPrice, cachedRunnerCurLayPrice);
+
+        this._placeLayOrder(cachedRunner, cachedRunnerCurLayPrice);
+        // this._setTimer(cachedRunner, cachedRunnerCurLayPrice, 'lay');
         return;
+      }
+      //Lay when they drift 10% between 40 - 45's
+      if (cachedRunnerPrevLayPrice >= LAY_PRICE_BOUNDARY3_START &&
+        cachedRunnerPrevLayPrice <= LAY_PRICE_BOUNDARY3_END &&
+        (cachedRunnerCurLayPrice / cachedRunnerPrevLayPrice) >= LAY_PRICE_BOUNDARY3_THRESHOLD) {
+        console.log('layLogic', cachedRunnerPrevLayPrice, cachedRunnerCurLayPrice);
+
+        this._placeLayOrder(cachedRunner, cachedRunnerCurLayPrice);
+        // this._setTimer(cachedRunner, cachedRunnerCurLayPrice, 'lay');
+        //return;
       }
     }
     //if runner falls out of range of criteria, clear timer for placing order, if set.
-    this._clearTimer(cachedRunner);
+    // this._clearTimer(cachedRunner);
   }
 
 
 }
 
-module.exports = MarketStreamStrategy;
+module
+  .exports = MarketStreamStrategy;

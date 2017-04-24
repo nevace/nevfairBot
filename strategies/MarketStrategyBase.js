@@ -17,16 +17,6 @@ class MarketStrategyBase {
     this.debug = false;
     this.bank = 0;
     event.on(`${this.username}:orderData`, this._handleOrderData.bind(this));
-    // market.marketDefinition.runners = market.marketDefinition.runners.sort((a, b) => a.bsp - b.bsp);
-
-    for (let runner of market.marketDefinition.runners) {
-      this.runners[runner.id] = runner;
-      this.runners[runner.id].ladder = {
-        lay: [{price: null, size: null}],
-        back: [{price: null, size: null}]
-      };
-      this.runners[runner.id].orders = {};
-    }
   }
 
   _handleOrderData(data) {
@@ -44,7 +34,6 @@ class MarketStrategyBase {
               for (let unmatchedOrder of orderChanges.uo) {
                 if (this.runners[orderChanges.id].orders[unmatchedOrder.id]) {
                   var redOutStatus = this.runners[orderChanges.id].orders[unmatchedOrder.id].redout;
-                  console.log('redoutStatus', redOutStatus);
                 }
                 this.runners[orderChanges.id].orders[unmatchedOrder.id] = unmatchedOrder;
                 this.runners[orderChanges.id].orders[unmatchedOrder.id].redout = redOutStatus;
@@ -69,7 +58,9 @@ class MarketStrategyBase {
    */
   _updateCache(runner, cachedRunner, type) {
     const ladderData = (type === 'lay') ? runner.bdatl : runner.bdatb;
-    cachedRunner.ladder[type][0] = {
+
+    cachedRunner.ladder[type].previous = cachedRunner.ladder[type].current;
+    cachedRunner.ladder[type].current = {
       price: ladderData[0][1],
       size: ladderData[0][2]
     };
@@ -119,6 +110,8 @@ class MarketStrategyBase {
 
       for (let runner of runnerChanges) {
         let cachedRunner = this.runners[runner.id];
+
+        if (!cachedRunner) continue;
 
         // update ladder lay cache if changed
         if (runner.bdatl && runner.bdatl.length) {

@@ -87,11 +87,18 @@ class StreamBase {
   }
 
   _handleSocketEnd(meta = {}) {
+    // this._saveStrategyLogs();
     log.debug('socket ended', this._logData(null, meta));
   }
 
   _handleSocketClose(hasErr, meta = {}) {
     log.info('socket closed', this._logData({error: hasErr}, meta));
+  }
+
+  _saveStrategyLogs() {
+    const runners = this.strategyIns.runners;
+    const runnerIds = Object.keys(this.strategyIns.runners);
+
   }
 
   _logData(dataToMerge = {}, meta) {

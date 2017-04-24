@@ -79,7 +79,7 @@ class BetFairClient {
     let betId;
     minOrderParams.size += 2;
     minOrderParams.price = (side === 'BACK') ? 1000 : 1.01;
-
+    console.log('minOrderPArams', minOrderParams);
     return this._doPlaceOrder(marketId, minOrderParams, logData)
       .then(res => {
         betId = res.instructionReports[0].betId;
