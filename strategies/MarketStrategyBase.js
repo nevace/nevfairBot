@@ -1,5 +1,6 @@
 const log = require('./../log');
 const event = require('../event');
+const moment = require('moment');
 
 class MarketStrategyBase {
   /**
@@ -100,6 +101,7 @@ class MarketStrategyBase {
   analyse(data) {
     //first image
     if (data.ct === 'SUB_IMAGE' || data.ct === 'RESUB_DELTA') {
+      this.startTime = moment(data.pt);
       log.info('read', Object.assign(data, this.logData));
       return;
     }
