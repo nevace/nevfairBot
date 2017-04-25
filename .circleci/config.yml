@@ -1,9 +1,0 @@
-version: 2
-jobs:
-  build:
-    working_directory: ~/nevfairBot
-    docker:
-      - image: circleci/node:7.9
-    steps:
-      - checkout
-      - run: echo "hello world"

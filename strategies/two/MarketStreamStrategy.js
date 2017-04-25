@@ -98,198 +98,207 @@ class MarketStreamStrategy extends MarketStrategyBase {
       this.runners[runner.id].orders = {};
     }
 
+    /**
+     * @param cachedRunner
+     * @param cachedRunnerBackPrice
+     * @param order
+     * @private
+     */
+    _placeBackOrder(cachedRunner, order, cachedRunnerBackPrice)
+    {
+      const redOutLoss = (cachedRunner.orders[order].avp / cachedRunnerBackPrice) * cachedRunner.orders[order].s;
+      const roundedLoss = Math.round(redOutLoss * 1e2) / 1e2;
+      console.log('back size', redOutLoss, roundedLoss);
+      cachedRunner.orders[order].redout = true;
+      const orderParams = {
+        selectionId: cachedRunner.id,
+        side: 'BACK',
+        size: roundedLoss,
+        price: 1.01
+      };
 
-  }
+      if (this.debug) {
+        this.bank -= cachedRunner.lay.stake;
+        this.bank += roundedLoss;
+        log.debug('bank', Object.assign({}, this.logData, {bank: this.bank}));
+        return;
+      }
 
-  /**
-   * @param cachedRunner
-   * @param cachedRunnerBackPrice
-   * @private
-   */
-  _placeBackOrder(cachedRunner, order, cachedRunnerBackPrice) {
-    const redOutLoss = (cachedRunner.orders[order].avp / cachedRunnerBackPrice) * cachedRunner.orders[order].s;
-    const roundedLoss = Math.round(redOutLoss * 1e2) / 1e2;
-    console.log('back size', redOutLoss, roundedLoss);
-    cachedRunner.orders[order].redout = true;
-    const orderParams = {
-      selectionId: cachedRunner.id,
-      side: 'BACK',
-      size: roundedLoss,
-      price: 1.01
-    };
+      BetfairClient.placeOrder(this.market.id, orderParams, this.logData)
+        .then(res => {
+          if (res.status === 'SUCCESS') {
+            cachedRunner.betOpen = false;
+          } else {
+            cachedRunner.orders[order].redout = false;
+            // cachedRunner.pendingOrder = null;
+          }
+        })
+        .catch(err => log.error('BetfairClient.placeBackOrder', Object.assign({}, err, this.logData)));
 
-    if (this.debug) {
-      this.bank -= cachedRunner.lay.stake;
-      this.bank += roundedLoss;
-      log.debug('bank', Object.assign({}, this.logData, {bank: this.bank}));
-      return;
     }
 
-    BetfairClient.placeOrder(this.market.id, orderParams, this.logData)
-      .then(res => {
-        if (res.status === 'SUCCESS') {
+
+    /**
+     * @param cachedRunner
+     * @param cachedRunnerLayPrice
+     * @private
+     */
+    _placeLayOrder(cachedRunner, cachedRunnerLayPrice)
+    {
+      const win = (this.stake / (cachedRunnerLayPrice - 1));
+      const roundedWin = Math.round(win * 1e2) / 1e2;
+      const orderParams = {
+        selectionId: cachedRunner.id,
+        side: 'LAY',
+        size: roundedWin,
+        price: cachedRunnerLayPrice
+      };
+      cachedRunner.betOpen = true;
+      console.log('lay size', win, roundedWin);
+      if (this.debug) {
+        this.bank += win;
+        log.debug('bank', Object.assign({}, this.logData, {bank: this.bank}));
+        return;
+      }
+
+      BetfairClient.placeOrder(this.market.id, orderParams, this.logData)
+        .then(res => {
+          if (res.status !== 'SUCCESS') {
+            cachedRunner.betOpen = false;
+          }
+        })
+        .catch(err => {
           cachedRunner.betOpen = false;
-        } else {
-          cachedRunner.orders[order].redout = false;
-          // cachedRunner.pendingOrder = null;
+          log.error('BetfairClient.placeLayOrder', Object.assign({}, err, this.logData))
+        });
+    }
+
+    /**
+     * @param {Object} cachedRunner The cached Runner Object
+     * @param {number} cachedRunnerPrice The cached Runner's lay/back price
+     * @param {('back'|'lay')} orderType The type of operation
+     * @description Places an order within a timeout and saves to the cached Runner.
+     * @private
+     */
+    _setTimer(cachedRunner, cachedRunnerPrice, orderType)
+    {
+      let operation, timer;
+
+      if (cachedRunner.pendingOrder) return;
+
+      if (orderType === 'lay') {
+        operation = this._placeLayOrder;
+        timer = LAY_PRICE_CHANGE_TIMER;
+      } else {
+        operation = this._placeBackOrder;
+        timer = BACK_PRICE_CHANGE_TIMER;
+      }
+      cachedRunner.pendingOrder = setTimeout(operation.bind(this), timer, cachedRunner, cachedRunnerPrice);
+    }
+
+    /**
+     * @param {Object} cachedRunner The cached Runner Object
+     * @description Clears the timeout and cancels the pending order to be placed.
+     * @private
+     */
+    _clearTimer(cachedRunner)
+    {
+      if (!cachedRunner.pendingOrder) return;
+      // log.debug('timeout cancelled', cachedRunner);
+      clearTimeout(cachedRunner.pendingOrder);
+      cachedRunner.pendingOrder = null;
+    }
+
+    /**
+     * @param {Object} cachedRunner The cached Runner Object
+     * @private
+     * @override
+     */
+    _applyBackLayLogic(cachedRunner)
+    {
+      if (cachedRunner.betOpen) {
+        this._backLogic(cachedRunner);
+      }
+      else {
+        this._layLogic(cachedRunner);
+      }
+    }
+
+    /**
+     * @param {Object} cachedRunner The cached Runner Object
+     * @private
+     * @override
+     */
+    _backLogic(cachedRunner)
+    {
+      const cachedRunnerCurLayPrice = cachedRunner.ladder.lay.current.price;
+      const cachedRunnerCurBackPrice = cachedRunner.ladder.back.current.price;
+
+      for (let order of Object.keys(cachedRunner.orders)) {
+
+        if (cachedRunner.orders[order].side === 'L' && !cachedRunner.orders[order].redout) {
+
+          if ((cachedRunnerCurLayPrice / cachedRunner.orders[order].avp) <= RED_OUT_THRESHOLD &&
+            cachedRunnerCurBackPrice < cachedRunnerCurLayPrice) {
+            this._placeBackOrder(cachedRunner, order, cachedRunnerCurLayPrice);
+            // this._setTimer(cachedRunner, cachedRunnerBackPrice, 'back');
+            return;
+          }
+
         }
-      })
-      .catch(err => log.error('BetfairClient.placeBackOrder', Object.assign({}, err, this.logData)));
-
-  }
-
-
-  /**
-   * @param cachedRunner
-   * @param cachedRunnerLayPrice
-   * @private
-   */
-  _placeLayOrder(cachedRunner, cachedRunnerLayPrice) {
-    const win = (this.stake / (cachedRunnerLayPrice - 1));
-    const roundedWin = Math.round(win * 1e2) / 1e2;
-    const orderParams = {
-      selectionId: cachedRunner.id,
-      side: 'LAY',
-      size: roundedWin,
-      price: cachedRunnerLayPrice
-    };
-    console.log('lay size', win, roundedWin);
-    if (this.debug) {
-      this.bank += win;
-      log.debug('bank', Object.assign({}, this.logData, {bank: this.bank}));
-      return;
+        // this._clearTimer(cachedRunner);
+      }
     }
 
-    BetfairClient.placeOrder(this.market.id, orderParams, this.logData)
-      .then(res => {
-        if (res.status === 'SUCCESS') {
-          cachedRunner.betOpen = true;
-        }
-      })
-      .catch(err => log.error('BetfairClient.placeLayOrder', Object.assign({}, err, this.logData)));
-  }
+    /**
+     * @param {Object} cachedRunner The cached Runner Object
+     * @private
+     * @override
+     */
+    _layLogic(cachedRunner)
+    {
+      const cachedRunnerPrevLayPrice = cachedRunner.ladder.lay.previous.price;
+      const cachedRunnerCurLayPrice = cachedRunner.ladder.lay.current.price;
 
-  /**
-   * @param {Object} cachedRunner The cached Runner Object
-   * @param {number} cachedRunnerPrice The cached Runner's lay/back price
-   * @param {('back'|'lay')} orderType The type of operation
-   * @description Places an order within a timeout and saves to the cached Runner.
-   * @private
-   */
-  _setTimer(cachedRunner, cachedRunnerPrice, orderType) {
-    let operation, timer;
+      if (cachedRunnerCurLayPrice <= LAY_PRICE_MAX && cachedRunnerCurLayPrice >= LAY_PRICE_MIN) {
+        //Lay when they drift 20% between 20's and 29
+        if (cachedRunnerPrevLayPrice >= LAY_PRICE_BOUNDARY1_START &&
+          cachedRunnerPrevLayPrice <= LAY_PRICE_BOUNDARY1_END &&
+          (cachedRunnerCurLayPrice / cachedRunnerPrevLayPrice) >= LAY_PRICE_BOUNDARY1_THRESHOLD) {
+          console.log('layLogic', cachedRunnerPrevLayPrice, cachedRunnerCurLayPrice);
 
-    if (cachedRunner.pendingOrder) return;
-
-    if (orderType === 'lay') {
-      operation = this._placeLayOrder;
-      timer = LAY_PRICE_CHANGE_TIMER;
-    } else {
-      operation = this._placeBackOrder;
-      timer = BACK_PRICE_CHANGE_TIMER;
-    }
-    cachedRunner.pendingOrder = setTimeout(operation.bind(this), timer, cachedRunner, cachedRunnerPrice);
-  }
-
-  /**
-   * @param {Object} cachedRunner The cached Runner Object
-   * @description Clears the timeout and cancels the pending order to be placed.
-   * @private
-   */
-  _clearTimer(cachedRunner) {
-    if (!cachedRunner.pendingOrder) return;
-    // log.debug('timeout cancelled', cachedRunner);
-    clearTimeout(cachedRunner.pendingOrder);
-    cachedRunner.pendingOrder = null;
-  }
-
-  /**
-   * @param {Object} cachedRunner The cached Runner Object
-   * @private
-   * @override
-   */
-  _applyBackLayLogic(cachedRunner) {
-    if (cachedRunner.betOpen) {
-      this._backLogic(cachedRunner);
-    }
-    else {
-      this._layLogic(cachedRunner);
-    }
-  }
-
-  /**
-   * @param {Object} cachedRunner The cached Runner Object
-   * @private
-   * @override
-   */
-  _backLogic(cachedRunner) {
-    const cachedRunnerCurLayPrice = cachedRunner.ladder.lay.current.price;
-    const cachedRunnerCurBackPrice = cachedRunner.ladder.back.current.price;
-    const averagePriceLayed = cachedRunner;
-
-    for (let order of Object.keys(cachedRunner.orders)) {
-
-      if (cachedRunner.orders[order].side === 'L' && !cachedRunner.orders[order].redout) {
-
-        if ((cachedRunnerCurLayPrice / cachedRunner.orders[order].avp) <= RED_OUT_THRESHOLD &&
-          cachedRunnerCurBackPrice < cachedRunnerCurLayPrice) {
-          this._placeBackOrder(cachedRunner, order, cachedRunnerCurLayPrice);
-          // this._setTimer(cachedRunner, cachedRunnerBackPrice, 'back');
+          this._placeLayOrder(cachedRunner, cachedRunnerCurLayPrice);
+          // this._setTimer(cachedRunner, cachedRunnerCurLayPrice, 'lay');
           return;
         }
+        //Lay when they drift 14% between 30's and 39
+        if (cachedRunnerPrevLayPrice >= LAY_PRICE_BOUNDARY2_START &&
+          cachedRunnerPrevLayPrice <= LAY_PRICE_BOUNDARY2_END &&
+          (cachedRunnerCurLayPrice / cachedRunnerPrevLayPrice) >= LAY_PRICE_BOUNDARY2_THRESHOLD) {
+          console.log('layLogic', cachedRunnerPrevLayPrice, cachedRunnerCurLayPrice);
 
+          this._placeLayOrder(cachedRunner, cachedRunnerCurLayPrice);
+          // this._setTimer(cachedRunner, cachedRunnerCurLayPrice, 'lay');
+          return;
+        }
+        //Lay when they drift 10% between 40 - 45's
+        if (cachedRunnerPrevLayPrice >= LAY_PRICE_BOUNDARY3_START &&
+          cachedRunnerPrevLayPrice <= LAY_PRICE_BOUNDARY3_END &&
+          (cachedRunnerCurLayPrice / cachedRunnerPrevLayPrice) >= LAY_PRICE_BOUNDARY3_THRESHOLD) {
+          console.log('layLogic', cachedRunnerPrevLayPrice, cachedRunnerCurLayPrice);
+
+          this._placeLayOrder(cachedRunner, cachedRunnerCurLayPrice);
+          // this._setTimer(cachedRunner, cachedRunnerCurLayPrice, 'lay');
+          //return;
+        }
       }
+      //if runner falls out of range of criteria, clear timer for placing order, if set.
       // this._clearTimer(cachedRunner);
     }
+
+
   }
 
-  /**
-   * @param {Object} cachedRunner The cached Runner Object
-   * @private
-   * @override
-   */
-  _layLogic(cachedRunner) {
-    const cachedRunnerPrevLayPrice = cachedRunner.ladder.lay.previous.price;
-    const cachedRunnerCurLayPrice = cachedRunner.ladder.lay.current.price;
-
-    if (cachedRunnerCurLayPrice <= LAY_PRICE_MAX && cachedRunnerCurLayPrice >= LAY_PRICE_MIN) {
-      //Lay when they drift 20% between 20's and 29
-      if (cachedRunnerPrevLayPrice >= LAY_PRICE_BOUNDARY1_START &&
-        cachedRunnerPrevLayPrice <= LAY_PRICE_BOUNDARY1_END &&
-        (cachedRunnerCurLayPrice / cachedRunnerPrevLayPrice) >= LAY_PRICE_BOUNDARY1_THRESHOLD) {
-        console.log('layLogic', cachedRunnerPrevLayPrice, cachedRunnerCurLayPrice);
-
-        this._placeLayOrder(cachedRunner, cachedRunnerCurLayPrice);
-        // this._setTimer(cachedRunner, cachedRunnerCurLayPrice, 'lay');
-        return;
-      }
-      //Lay when they drift 14% between 30's and 39
-      if (cachedRunnerPrevLayPrice >= LAY_PRICE_BOUNDARY2_START &&
-        cachedRunnerPrevLayPrice <= LAY_PRICE_BOUNDARY2_END &&
-        (cachedRunnerCurLayPrice / cachedRunnerPrevLayPrice) >= LAY_PRICE_BOUNDARY2_THRESHOLD) {
-        console.log('layLogic', cachedRunnerPrevLayPrice, cachedRunnerCurLayPrice);
-
-        this._placeLayOrder(cachedRunner, cachedRunnerCurLayPrice);
-        // this._setTimer(cachedRunner, cachedRunnerCurLayPrice, 'lay');
-        return;
-      }
-      //Lay when they drift 10% between 40 - 45's
-      if (cachedRunnerPrevLayPrice >= LAY_PRICE_BOUNDARY3_START &&
-        cachedRunnerPrevLayPrice <= LAY_PRICE_BOUNDARY3_END &&
-        (cachedRunnerCurLayPrice / cachedRunnerPrevLayPrice) >= LAY_PRICE_BOUNDARY3_THRESHOLD) {
-        console.log('layLogic', cachedRunnerPrevLayPrice, cachedRunnerCurLayPrice);
-
-        this._placeLayOrder(cachedRunner, cachedRunnerCurLayPrice);
-        // this._setTimer(cachedRunner, cachedRunnerCurLayPrice, 'lay');
-        //return;
-      }
-    }
-    //if runner falls out of range of criteria, clear timer for placing order, if set.
-    // this._clearTimer(cachedRunner);
-  }
-
-
-}
-
-module
-  .exports = MarketStreamStrategy;
+  module
+.
+  exports = MarketStreamStrategy;
