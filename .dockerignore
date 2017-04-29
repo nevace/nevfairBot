@@ -2,10 +2,6 @@
 node_modules
 tmp
 npm-debug.log
-secrets
-*.crt
-*.csr
-*.key
 *.pem
 .idea
 .gitignore
