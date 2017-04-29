@@ -2,7 +2,7 @@
   steps:
     - name: test
       service: app
-      command: npm test-verbose
+      command: npm run test-verbose
     - name: dockerhub_push
       service: app
       type: push

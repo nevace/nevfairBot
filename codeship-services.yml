@@ -6,6 +6,7 @@ app:
     - /Users/liam/projects/nevfairBot/secrets:/home/nevace/nevfairBot/secrets
   links:
     - mongo
+  cached: true
 mongo:
   image: mongo
   volumes:
