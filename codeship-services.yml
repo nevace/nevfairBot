@@ -1,6 +1,6 @@
 app:
   build:
-    image: nevfair-bot
+    image: nevace/nevfairbot
     dockerfile: Dockerfile
   volumes:
     - /Users/liam/projects/nevfairBot/secrets:/home/nevace/nevfairBot/secrets
