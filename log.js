@@ -1,20 +1,19 @@
 const winston = require('winston');
-require('winston-mongodb').MongoDB;
 const DB = require('./DB');
 const env = process.env.NODE_ENV || 'development';
+const transports = [
+  new (winston.transports.Console)({
+    timestamp: new Date(),
+    colorize: true,
+    // level: env === 'development' ? 'debug' : 'info',
+    level: 'debug',
+    prettyPrint: true,
+  })
+];
 
-const Log = new winston.Logger({
-  transports: [
-    new (winston.transports.Console)({
-      timestamp: new Date(),
-      colorize: true,
-      level: env === 'development' ? 'debug' : 'info',
-      prettyPrint: true,
-    }),
-    new (winston.transports.MongoDB)({
-      db: DB
-    })
-  ]
-});
+if (process.env.NODE_ENV !== 'test') {
+  // require('winston-mongodb').MongoDB;
+  // transports.push(new (winston.transports.MongoDB)({db: DB}))
+}
 
-module.exports = Log;
+module.exports = new winston.Logger({transports});

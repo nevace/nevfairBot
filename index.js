@@ -1,6 +1,6 @@
 const log = require('./log');
 const NevfairBot = require('./NevfairBot');
-const botConfig = require('./botConfig.json');
+const botConfig = require('./secrets/botConfig');
 
 for (let account of botConfig.accounts) {
   new NevfairBot(account.credentials, account.strategies);

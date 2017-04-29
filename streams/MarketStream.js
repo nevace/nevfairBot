@@ -1,5 +1,5 @@
 const StreamBase = require('./StreamBase');
-
+const event = require('../event');
 /**
  * @extends StreamBase
  */
@@ -23,6 +23,9 @@ class MarketStream extends StreamBase {
   }
 
   _handleSocketClose(hasErr) {
+    console.log('eventhere', event);
+    this.strategyIns.removeListener();
+    console.log('eventhere', event);
     super._handleSocketClose(hasErr, {marketId: this.market.id});
   }
 

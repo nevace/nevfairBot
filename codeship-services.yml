@@ -1,0 +1,15 @@
+test:
+  app:
+    image: nevfair-bot
+    dockerfile: Dockerfile
+  volumes:
+    - /Users/liam/projects/nevfairBot/secrets:/home/nevace/nevfairBot/secrets
+  links:
+    - mongo
+mongo:
+  image: mongo
+  volumes:
+    - /usr/local/var/mongodb:/data/db
+  ports:
+    - "27017:27017"
+  command: sleep 1

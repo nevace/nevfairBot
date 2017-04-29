@@ -9,6 +9,7 @@ const log = require('./log');
 const BETFAIR_LOGIN = 'https://identitysso.betfair.com/api/certlogin/';
 const BETFAIR_KEEPALIVE = 'https://identitysso.betfair.com/api/keepAlive';
 const BETFAIR_API = 'https://api.betfair.com/exchange/betting/rest/v1.0/';
+const path = require('path');
 
 class BetFairClient {
   constructor() {
@@ -17,8 +18,8 @@ class BetFairClient {
         'Accept': 'application/json'
       },
       httpsAgent: new https.Agent({
-        cert: fs.readFileSync('./client-2048.crt'),
-        key: fs.readFileSync('./client-2048.key')
+        cert: fs.readFileSync('./secrets/client-2048.crt'),
+        key: fs.readFileSync('./secrets/client-2048.key')
       })
     };
   }

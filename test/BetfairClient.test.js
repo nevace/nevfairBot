@@ -6,8 +6,7 @@ describe('BetFairClient', () => {
 
     it('should have correct headers', () => {
       expect(BetfairClient.config.headers).to.eql({
-        'Accept': 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Accept': 'application/json'
       });
     });
 

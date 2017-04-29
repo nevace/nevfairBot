@@ -95,6 +95,10 @@ class MarketStrategyBase {
 
   }
 
+  removeListener() {
+    event.removeListener(`${this.username}:orderData`, this._handleOrderData);
+  }
+
   /**
    * @param data
    */
