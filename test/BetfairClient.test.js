@@ -9,12 +9,6 @@ describe('BetFairClient', () => {
         'Accept': 'application/json'
       });
     });
-
-    it('should have correct certs', () => {
-      expect(BetfairClient.config.httpsAgent.options.key).to.not.be.an('undefined');
-      expect(BetfairClient.config.httpsAgent.options.cert).to.not.be.an('undefined');
-    });
-
   });
 
   describe('login', () => {
