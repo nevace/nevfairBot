@@ -11,4 +11,4 @@
       encrypted_dockercfg_path: dockercfg.encrypted
     - name: deploy
       service: ssh
-      command: ssh nevace@139.59.178.69 'bash -s' < . deploy.sh
+      command: ssh nevace@139.59.178.69 'bash -s' < deploy.sh
