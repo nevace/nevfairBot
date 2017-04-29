@@ -1,27 +1,4 @@
 version: "2.1"
 services:
-  test:
-    build: .
-    volumes:
-      - /Users/liam/projects/nevfairBot/secrets:/home/nevace/nevfairBot/secrets
-#    links:
-#      - mongo
-#    depends_on:
-#      mongo:
-#        condition: service_healthy
-#    environment:
-#      - NODE_ENV=test
-  mongo:
-    image: healthcheck/mongo
-    volumes:
-      - /usr/local/var/mongodb:/data/db
-    ports:
-      - "27017:27017"
-    links:
-      - test
-#      - "80:80"
-#    healthcheck:
-#      test: ["CMD", "curl", "-f", "http://www.google.com:80"]
-#      interval: 1s
-#      timeout: 5s
-#      retries: 5
+  app:
+    image: nevace/nevfairbot

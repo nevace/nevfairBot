@@ -1,7 +1,6 @@
-FROM node:7.6.0
+FROM node:7.6.0-alpine
 
-#RUN addgroup -S nevace && adduser -S -g nevace nevace
-RUN useradd -ms /bin/bash nevace
+RUN addgroup -S nevace && adduser -S -g nevace nevace
 
 ENV HOME=/home/nevace
 
@@ -18,5 +17,4 @@ RUN npm cache clean && \
 
 ADD . $HOME/nevfairBot/
 
-#CMD ["sleep", "10"]
-#CMD ["npm", "start"]
+CMD ["npm", "start"]
