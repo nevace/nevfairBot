@@ -2,15 +2,13 @@ app:
   build:
     image: nevace/nevfairbot
     dockerfile: Dockerfile
-  volumes:
-    - /Users/liam/projects/nevfairBot/secrets:/home/nevace/nevfairBot/secrets
   links:
     - mongo
   cached: true
 mongo:
   image: mongo
   volumes:
-    - /usr/local/var/mongodb:/data/db
+    - /data/db:/data/db
   ports:
     - "27017:27017"
   command: sleep 1
