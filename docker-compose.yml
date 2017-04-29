@@ -1,4 +1,12 @@
 version: "2.1"
 services:
   app:
-    image: nevace/nevfairbot
+    build: .
+    links:
+      - mongo
+  mongo:
+    image: mongo
+    volumes:
+      - /data/db:/data/db
+    ports:
+      - "27017:27017"

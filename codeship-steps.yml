@@ -9,3 +9,6 @@
       image_name: nevace/nevfairbot
       registry: https://index.docker.io/v1/
       encrypted_dockercfg_path: dockercfg.encrypted
+    - name: deploy
+      service: ssh
+      command: ssh nevace@139.59.178.69 'bash -s' < . deploy.sh

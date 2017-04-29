@@ -6,7 +6,7 @@
   "scripts": {
     "test": "NODE_ENV=test mocha",
     "test-verbose": "NODE_ENV=test node_modules/.bin/mocha -R spec",
-    "start": "NODE_ENV=production node index.js"
+    "start": "NODE_ENV=production pm2-docker index.js"
   },
   "author": "",
   "license": "ISC",
