@@ -17,5 +17,3 @@ ssh:
     image: deploy
     dockerfile_path: Dockerfile.deploy
     encrypted_env_file: sshkey.env.encrypted
-  environment:
-    HOME: /home/nevace
