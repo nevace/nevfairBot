@@ -9,4 +9,6 @@ COPY deploy.sh $HOME
 
 RUN chown -R nevace:nevace $HOME
 
+WORKDIR $HOME
+
 USER nevace
