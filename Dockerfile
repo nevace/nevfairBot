@@ -13,8 +13,6 @@ RUN chown -R nevace:nevace $HOME/*
 
 USER nevace
 
-RUN mkdir -p "$HOME/.ssh" && echo -e $PRIVATE_SSH_KEY >> $HOME/.ssh/id_rsa
-
 WORKDIR $HOME/nevfairBot/
 
 RUN npm cache clean && \

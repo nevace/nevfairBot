@@ -1,8 +1,7 @@
 app:
   build:
     image: nevace/nevfairbot
-    dockerfile: Dockerfile
-  encrypted_env_file: sshkey.env.encrypted
+    dockerfile_path: Dockerfile
   links:
     - mongo
   cached: true
@@ -14,4 +13,7 @@ mongo:
     - "27017:27017"
   command: sleep 1
 ssh:
-  build: .
+  build:
+    image: deploy
+    dockerfile_path: Dockerfile.deploy
+    encrypted_env_file: sshkey.env.encrypted

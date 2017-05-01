@@ -1,0 +1,10 @@
+FROM node:7.6.0
+
+#RUN addgroup -S nevace && adduser -S -g nevace nevace
+RUN useradd -ms /bin/bash nevace
+
+ENV HOME=/home/nevace
+
+RUN chown -R nevace:nevace $HOME
+
+USER nevace
