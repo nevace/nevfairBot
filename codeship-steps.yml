@@ -1,8 +1,0 @@
-- type: serial
-  steps:
-    - name: test
-      service: app
-      command: npm run test-verbose
-    - name: deploy
-      service: ssh
-      command: bash deploy.sh
