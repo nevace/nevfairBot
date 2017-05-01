@@ -5,4 +5,4 @@
       command: npm run test-verbose
     - name: deploy
       service: ssh
-      command: . deploy.sh
+      command: source deploy.sh
