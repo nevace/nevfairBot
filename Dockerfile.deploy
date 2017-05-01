@@ -5,6 +5,8 @@ RUN useradd -ms /bin/bash nevace
 
 ENV HOME=/home/nevace
 
+COPY deploy.sh
+
 RUN chown -R nevace:nevace $HOME
 
 USER nevace
