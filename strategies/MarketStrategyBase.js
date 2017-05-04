@@ -1,6 +1,7 @@
 const log = require('./../log');
 const event = require('../event');
 const moment = require('moment');
+const randomId = require('random-id');
 
 class MarketStrategyBase {
   /**
@@ -10,6 +11,7 @@ class MarketStrategyBase {
    * @param strategyName
    */
   constructor(username, streamName, market, strategyName) {
+    this.id = parseInt(randomId(9, '0'));
     this.username = username;
     this.stream = streamName;
     this.strategyName = strategyName;
@@ -18,7 +20,14 @@ class MarketStrategyBase {
     this.debug = false;
     this.bank = 0;
     event.on(`${this.username}:orderData`, this._handleOrderData.bind(this));
+    // this._listenForOrderData();
   }
+
+  // _listenForOrderData() {
+  //   const handleOrderData = this._handleOrderData.bind(this);
+  //   Object.defineProperty(handleOrderData, 'name', {value: `${handleOrderData}`, writable: false});
+  //   event.on(`${this.username}:orderData`,);
+  // }
 
   _handleOrderData(data) {
     //first image
@@ -32,14 +41,31 @@ class MarketStrategyBase {
         if (market.id === this.market.id && market.orc) {
           for (let orderChanges of market.orc) {
             if (orderChanges.uo && orderChanges.uo.length) {
+              let runnerOrders = this.runners[orderChanges.id].orders;
               for (let unmatchedOrder of orderChanges.uo) {
-                if (this.runners[orderChanges.id].orders[unmatchedOrder.id]) {
-                  var redOutStatus = this.runners[orderChanges.id].orders[unmatchedOrder.id].redout;
+                let isClosed = false;
+                let greenOpen = false;
+                //if runner exists in cache, add flags if not there
+                if (runnerOrders[unmatchedOrder.id]) {
+                  isClosed = runnerOrders[unmatchedOrder.id].closed || false;
+                  greenOpen = runnerOrders[unmatchedOrder.id].greenOpen || false;
                 }
-                this.runners[orderChanges.id].orders[unmatchedOrder.id] = unmatchedOrder;
-                this.runners[orderChanges.id].orders[unmatchedOrder.id].redout = redOutStatus;
-                if (this.runners[orderChanges.id].orders[unmatchedOrder.id].sc !== 0) {
-                  delete this.runners[orderChanges.id].orders[unmatchedOrder.id];
+                //overwrite runner with new data
+                runnerOrders[unmatchedOrder.id] = unmatchedOrder;
+                //remove cancelled orders
+                if (runnerOrders[unmatchedOrder.id].sc > 0) {
+                  delete runnerOrders[unmatchedOrder.id];
+                } else {
+                  //update green status and closed status if green bet has been matched
+                  const allBackOrdersGreen = orderChanges.uo.filter(uO => uO.side === 'B' && uO.sr === 0).length;
+                  if (allBackOrdersGreen) {
+                    runnerOrders[unmatchedOrder.id].greenOpen = false;
+                    runnerOrders[unmatchedOrder.id].closed = true;
+                    this.runners[orderChanges.id].runnerOpen = false;
+                  } else {
+                    runnerOrders[unmatchedOrder.id].closed = isClosed;
+                    runnerOrders[unmatchedOrder.id].greenOpen = greenOpen;
+                  }
                 }
               }
             }

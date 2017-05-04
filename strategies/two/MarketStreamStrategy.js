@@ -21,6 +21,7 @@ const BACK_PRICE_CHANGE_TIMER = 1000;
 const LAY_PRICE_CHANGE_TIMER = 1;
 
 const RED_OUT_THRESHOLD = 0.5;
+const GREEN_OUT_THRESHOLD = 1.25; //25%
 const LAY_PRICE_BOUNDARY1_START = 20;
 const LAY_PRICE_BOUNDARY1_END = 29;
 const LAY_PRICE_BOUNDARY1_THRESHOLD = 1.2;
@@ -66,6 +67,9 @@ class MarketStreamStrategy extends MarketStrategyBase {
   }
 
   _filterRunners() {
+    //sort by bsp and remove 1st - 3rd fav and any with bsp less than 20
+    this.market.marketDefinition.runners = this.market.marketDefinition.runners.sort((a, b) => a.bsp - b.bsp);
+    this.market.marketDefinition.runners.splice(0, 3);
     for (let i = this.market.marketDefinition.runners.length - 1; i >= 0; i--) {
       if (this.market.marketDefinition.runners[i].bsp < 20 || !this.market.marketDefinition.runners[i].bsp) {
         this.market.marketDefinition.runners.splice(i, 1);
@@ -106,38 +110,72 @@ class MarketStreamStrategy extends MarketStrategyBase {
    * @param cachedRunner
    * @param cachedRunnerBackPrice
    * @param order
+   * @param backType
    * @private
    */
-  _placeBackOrder(cachedRunner, order, cachedRunnerBackPrice) {
-    const redOutLoss = (cachedRunner.orders[order].avp / cachedRunnerBackPrice) * cachedRunner.orders[order].s;
-    const roundedLoss = Math.round(redOutLoss * 1e2) / 1e2;
-    console.log('back size', redOutLoss, roundedLoss);
-    cachedRunner.orders[order].redout = true;
+  _placeBackOrder(cachedRunner, order, cachedRunnerBackPrice, backType) {
+    const currentOrder = cachedRunner.orders[order];
+    const stake = (backType === 'green') ? ((currentOrder.avp - 1) * currentOrder.s) / (cachedRunnerBackPrice - 1)
+      : (currentOrder.avp / cachedRunnerBackPrice) * currentOrder.s;
+    const roundedStake = Math.round(stake * 1e2) / 1e2;
     const orderParams = {
       selectionId: cachedRunner.id,
       side: 'BACK',
-      size: roundedLoss,
-      price: 1.01
+      size: roundedStake
     };
+
+    currentOrder.closed = true;
 
     if (this.debug) {
       this.bank -= cachedRunner.lay.stake;
-      this.bank += roundedLoss;
+      this.bank += roundedStake;
       log.debug('bank', Object.assign({}, this.logData, {bank: this.bank}));
       return;
     }
 
-    BetfairClient.placeOrder(this.market.id, orderParams, this.logData)
-      .then(res => {
-        if (res.status === 'SUCCESS') {
-          cachedRunner.betOpen = false;
-        } else {
-          cachedRunner.orders[order].redout = false;
-          // cachedRunner.pendingOrder = null;
-        }
-      })
-      .catch(err => log.error('BetfairClient.placeBackOrder', Object.assign({}, err, this.logData)));
-
+    if (backType === 'green') {
+      currentOrder.greenOpen = true;
+      orderParams.price = cachedRunnerBackPrice;
+      BetfairClient.placeOrder(this.market.id, orderParams, this.logData)
+        .then(res => {
+          if (res.status !== 'SUCCESS') {
+            currentOrder.greenOpen = false;
+            currentOrder.closed = false;
+          }
+        })
+        .catch(err => {
+          currentOrder.greenOpen = false;
+          currentOrder.closed = false;
+          log.error('BetfairClient.placeBackOrder', Object.assign({}, err, this.logData))
+        });
+    } else {
+      orderParams.price = 1.01;
+      cachedRunner.runnerOpen = false;
+      //redout with new order
+      BetfairClient.placeOrder(this.market.id, orderParams, this.logData)
+        .then(res => {
+          if (res.status === 'SUCCESS') {
+            if (currentOrder.greenOpen) {
+              //loop through all unmatched back orders for this runner and cancel
+              for (let orderId of Object.keys(cachedRunner.orders)) {
+                if (cachedRunner.orders[orderId].side === 'B' && cachedRunner.orders[orderId].sr > 0) {
+                  BetfairClient.cancelOrder(this.market.id, orderId, this.logData)
+                    .then(() => currentOrder.greenOpen = false)
+                    .catch(err => log.error('couldn\t cancel back order!', err));
+                }
+              }
+            }
+          } else {
+            currentOrder.closed = false;
+            cachedRunner.runnerOpen = true;
+          }
+        })
+        .catch(err => {
+          currentOrder.closed = false;
+          cachedRunner.runnerOpen = true;
+          log.error('BetfairClient.placeLayOrder', Object.assign({}, err, this.logData))
+        });
+    }
   }
 
 
@@ -155,7 +193,7 @@ class MarketStreamStrategy extends MarketStrategyBase {
       size: roundedWin,
       price: cachedRunnerLayPrice
     };
-    cachedRunner.betOpen = true;
+    cachedRunner.runnerOpen = true;
     console.log('lay size', win, roundedWin);
     if (this.debug) {
       this.bank += win;
@@ -166,11 +204,11 @@ class MarketStreamStrategy extends MarketStrategyBase {
     BetfairClient.placeOrder(this.market.id, orderParams, this.logData)
       .then(res => {
         if (res.status !== 'SUCCESS') {
-          cachedRunner.betOpen = false;
+          cachedRunner.runnerOpen = false;
         }
       })
       .catch(err => {
-        cachedRunner.betOpen = false;
+        cachedRunner.runnerOpen = false;
         log.error('BetfairClient.placeLayOrder', Object.assign({}, err, this.logData))
       });
   }
@@ -221,7 +259,7 @@ class MarketStreamStrategy extends MarketStrategyBase {
       }
       this.raceStartTimerActive = false;
     }
-    if (cachedRunner.betOpen) {
+    if (cachedRunner.runnerOpen) {
       this._backLogic(cachedRunner);
     }
     else {
@@ -237,16 +275,26 @@ class MarketStreamStrategy extends MarketStrategyBase {
   _backLogic(cachedRunner) {
     const cachedRunnerCurLayPrice = cachedRunner.ladder.lay.current.price;
     const cachedRunnerCurBackPrice = cachedRunner.ladder.back.current.price;
+    const runnerOrders = Object.keys(cachedRunner.orders);
 
-    for (let order of Object.keys(cachedRunner.orders)) {
+    for (let order of runnerOrders) {
+      let currentOrder = cachedRunner.orders[order];
+      if (currentOrder.side === 'L' && (!currentOrder.closed || currentOrder.greenOpen)) {
 
-      if (cachedRunner.orders[order].side === 'L' && !cachedRunner.orders[order].redout) {
+        if (cachedRunnerCurBackPrice < cachedRunnerCurLayPrice) {
+          if ((cachedRunnerCurLayPrice / currentOrder.avp) <= RED_OUT_THRESHOLD) {
+            this._placeBackOrder(cachedRunner, order, cachedRunnerCurLayPrice, 'red');
+            console.log('backLogic', 'red', currentOrder.avp, cachedRunnerCurLayPrice);
+            // this._setTimer(cachedRunner, cachedRunnerBackPrice, 'back');
+            return;
+          }
 
-        if ((cachedRunnerCurLayPrice / cachedRunner.orders[order].avp) <= RED_OUT_THRESHOLD &&
-          cachedRunnerCurBackPrice < cachedRunnerCurLayPrice) {
-          this._placeBackOrder(cachedRunner, order, cachedRunnerCurLayPrice);
-          // this._setTimer(cachedRunner, cachedRunnerBackPrice, 'back');
-          return;
+          if ((cachedRunnerCurBackPrice / currentOrder.avp) >= GREEN_OUT_THRESHOLD && !currentOrder.closed) {
+            this._placeBackOrder(cachedRunner, order, cachedRunnerCurBackPrice, 'green');
+            console.log('backLogic', 'green', currentOrder.avp, cachedRunnerCurBackPrice);
+            // this._setTimer(cachedRunner, cachedRunnerBackPrice, 'back');
+            return;
+          }
         }
 
       }

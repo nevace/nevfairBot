@@ -12,8 +12,8 @@ const transports = [
 ];
 
 if (process.env.NODE_ENV !== 'test') {
-  // require('winston-mongodb').MongoDB;
-  // transports.push(new (winston.transports.MongoDB)({db: DB}))
+  require('winston-mongodb').MongoDB;
+  transports.push(new (winston.transports.MongoDB)({db: DB}))
 }
 
 module.exports = new winston.Logger({transports});
