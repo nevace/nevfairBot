@@ -21,7 +21,7 @@ const BACK_PRICE_CHANGE_TIMER = 1000;
 const LAY_PRICE_CHANGE_TIMER = 1;
 
 const RED_OUT_THRESHOLD = 0.5;
-const GREEN_OUT_THRESHOLD = 1.25; //25%
+const GREEN_OUT_THRESHOLD = 1.5; //25%
 const LAY_PRICE_BOUNDARY1_START = 20;
 const LAY_PRICE_BOUNDARY1_END = 29;
 const LAY_PRICE_BOUNDARY1_THRESHOLD = 1.2;
@@ -253,6 +253,7 @@ class MarketStreamStrategy extends MarketStrategyBase {
    * @override
    */
   _applyBackLayLogic(cachedRunner) {
+
     if (this.raceStartTimerActive) {
       if (moment().diff(this.startTime, 'seconds') < 5) {
         return;
@@ -263,6 +264,7 @@ class MarketStreamStrategy extends MarketStrategyBase {
       this._backLogic(cachedRunner);
     }
     else {
+      //if raceNearingEnd return
       this._layLogic(cachedRunner);
     }
   }

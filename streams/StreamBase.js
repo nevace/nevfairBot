@@ -1,6 +1,7 @@
 const tls = require('tls');
 const randomId = require('random-id');
 const log = require('../log');
+const pm2 = require('pm2');
 
 class StreamBase {
   constructor(appKey, session, strategy, username) {
@@ -44,6 +45,13 @@ class StreamBase {
 
   _handleErr(err, meta = {}) {
     log.error('socket error', this._logData({error: err}, meta));
+
+    if (err.code === 'ECONNRESET' && this.constructor.name === 'MasterStream') {
+      pm2.restart('index', (err, apps) => {
+        if (err) log.error('error restarting!', err);
+        log.info('restarted app', apps);
+      });
+    }
   }
 
   _handleData(rawData, meta = {}) {
