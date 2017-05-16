@@ -8,10 +8,11 @@ class OrderStream extends StreamBase {
     this.subscriptionConfig = {
       op: 'orderSubscription'
     };
+    console.log('dddd', appKey, session, strategy, username);
   }
 
   _processData(data) {
-    event.emit(`${this.username}:${this.strategy.strategy}:orderData`, data);
+    event.emit(`${this.username}:orderData`, data);
   }
 
 }

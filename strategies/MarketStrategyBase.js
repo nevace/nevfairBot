@@ -20,8 +20,8 @@ class MarketStrategyBase {
     this.debug = false;
     this.bank = 0;
 
-    if (event.eventNames().indexOf(`${this.username}:${this.strategyName}:orderData`) === -1) {
-      event.on(`${this.username}:${this.strategyName}:orderData`, this._handleOrderData.bind(this));
+    if (event.eventNames().indexOf(`${this.username}:orderData`) === -1) {
+      event.on(`${this.username}:orderData`, this._handleOrderData.bind(this));
     }
   }
 
