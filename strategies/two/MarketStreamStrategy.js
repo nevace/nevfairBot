@@ -2,6 +2,7 @@ const log = require('../../log');
 const MarketStrategyBase = require('../MarketStrategyBase');
 const BetfairClient = require('../../BetfairClient');
 const moment = require('moment');
+const DB = require('../../DB');
 
 //adding back and lay specific timers and changing time to 3 secs
 
@@ -31,6 +32,7 @@ const LAY_PRICE_BOUNDARY2_THRESHOLD = 1.14;
 const LAY_PRICE_BOUNDARY3_START = 40;
 const LAY_PRICE_BOUNDARY3_END = 45;
 const LAY_PRICE_BOUNDARY3_THRESHOLD = 1.1;
+const SECS_FROM_FINISH = 30;
 
 /**
  * @extends MarketStrategyBase
@@ -62,6 +64,7 @@ class MarketStreamStrategy extends MarketStrategyBase {
       }
     };
     this.raceStartTimerActive = true;
+    this.raceNearingEnd = true;
     this._filterRunners();
     this._buildRunnerCache();
   }
@@ -77,33 +80,84 @@ class MarketStreamStrategy extends MarketStrategyBase {
     }
   }
 
-  _buildRunnerCache() {
-    for (let runner of this.market.marketDefinition.runners) {
-      this.runners[runner.id] = runner;
-      this.runners[runner.id].ladder = {
-        lay: {
-          previous: {
-            price: null,
-            size: null
-          },
-          current: {
-            price: null,
-            size: null
-          }
-        },
-        back: {
-          previous: {
-            price: null,
-            size: null
-          },
-          current: {
-            price: null,
-            size: null
-          }
+  _getRaceTimeout(timeformData) {
+    const query = {
+      COURSE: timeformData.race.course.name,
+      RACE_TYPE: timeformData.race.raceType.full,
+      // JUMPS_FLAG: (timeformData.race.course.courseType === 'JUMP'),
+      DISTANCE: timeformData.race.distance
+    };
+    let db;
+    log.info('raceTimeout query', Object.assign({}, this.logData, query));
+    return DB.then(res => {
+      db = res;
+      return db.collection('course_times').find(query).toArray();
+    })
+      .then(res => {
+        if (res.length) {
+          const data = res[0];
+          const timeout = parseInt(data.AVG_WINNING_TIME, 10) - SECS_FROM_FINISH;
+          log.info('found course data!', Object.assign({}, this.logData, {length: res.length, data}));
+          log.debug(`stop opening orders in ${timeout} seconds`);
+          this.raceNearingEnd = false;
+          setTimeout(() => {
+            log.debug('stop opening orders!');
+            this.raceNearingEnd = true;
+          }, timeout * 1000);
+          return 'found data';
+        } else {
+          const update = {
+            course: timeformData.race.course,
+            raceType: timeformData.race.raceType,
+            distance: timeformData.race.distance
+          };
+          return db.collection('missing_course_times').updateOne(update, update, {upsert: true})
         }
-      };
-      this.runners[runner.id].orders = {};
-    }
+      });
+  }
+
+  _buildRunnerCache() {
+    let timeformData;
+    BetfairClient.getTimeFormData(this.market.id, this.logData)
+      .then(data => {
+        timeformData = data;
+        return this._getRaceTimeout(timeformData);
+      })
+      .then(res => {
+        if (res === 'found data') {
+          for (let runner of this.market.marketDefinition.runners) {
+            let horse = timeformData.runners.filter(hrs => hrs.selections[0].selectionId == runner.id);
+            this.runners[runner.id] = runner;
+            this.runners[runner.id].name = horse[0].name;
+            this.runners[runner.id].ladder = {
+              lay: {
+                previous: {
+                  price: null,
+                  size: null
+                },
+                current: {
+                  price: null,
+                  size: null
+                }
+              },
+              back: {
+                previous: {
+                  price: null,
+                  size: null
+                },
+                current: {
+                  price: null,
+                  size: null
+                }
+              }
+            };
+            this.runners[runner.id].orders = {};
+          }
+        } else {
+          throw new Error('no course data found!');
+        }
+      })
+      .catch(err => log.error('_buildRunnerCache', Object.assign({}, {error: err.toString()}, this.logData)));
   }
 
   /**
@@ -262,9 +316,8 @@ class MarketStreamStrategy extends MarketStrategyBase {
     }
     if (cachedRunner.runnerOpen) {
       this._backLogic(cachedRunner);
-    }
-    else {
-      //if raceNearingEnd return
+    } else {
+      if (this.raceNearingEnd) return;
       this._layLogic(cachedRunner);
     }
   }

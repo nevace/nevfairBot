@@ -106,7 +106,6 @@ class StreamBase {
   _saveStrategyLogs() {
     const runners = this.strategyIns.runners;
     const runnerIds = Object.keys(this.strategyIns.runners);
-
   }
 
   _logData(dataToMerge = {}, meta) {

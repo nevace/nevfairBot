@@ -9,7 +9,9 @@ const log = require('./log');
 const BETFAIR_LOGIN = 'https://identitysso.betfair.com/api/certlogin/';
 const BETFAIR_KEEPALIVE = 'https://identitysso.betfair.com/api/keepAlive';
 const BETFAIR_API = 'https://api.betfair.com/exchange/betting/rest/v1.0/';
-
+const BETFAIR_TIMEFORM = 'https://www.betfair.com/rest/v2/raceCard';
+const BETFAIR_HOME = 'https://www.betfair.com/exchange/plus';
+const USERAGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.96 Safari/537.36';
 const httpsConfig = (process.env.NODE_ENV === 'test') ? {} : {
   cert: fs.readFileSync('./secrets/client-2048.crt'),
   key: fs.readFileSync('./secrets/client-2048.key')
@@ -75,6 +77,27 @@ class BetFairClient {
       .catch(err => this._handleOrderRes(true, err, logData, `replace order`));
   }
 
+  getTimeFormData(marketId, logData) {
+    const headers = {
+      'User-Agent': USERAGENT
+    };
+    return axios.get(BETFAIR_HOME, {headers})
+      .then(res => {
+        const appKey = /"appKey":\s"(.*?)"/g.exec(res.data)[1];
+        if (!appKey) throw new Error('App Key not found on Betfair!');
+        headers['X-Application'] = appKey;
+
+        return axios.get(BETFAIR_TIMEFORM, {
+          headers,
+          params: {
+            marketId,
+            dataEntries: '[RACE,TIMEFORM_DATA,RUNNERS,RUNNER_DETAILS]'
+          }
+        });
+      })
+      .then(res => this._handleOrderRes(false, res, logData, `timeform data`))
+  }
+
   _placeOrderMin(marketId, orderParams, logData) {
     const minOrderParams = clone(orderParams);
     const {price, side} = orderParams;
@@ -100,18 +123,19 @@ class BetFairClient {
    * @private
    */
   _handleOrderRes(err, res, logData, logMessage) {
+    const result = (Array.isArray(res.data)) ? res.data.pop() : res.data;
     if (err) {
-      let error = (res.response) ? res.response.data : res.data || res.message || res;
+      let error = (res.response) ? res.response.data : result || res.message || res;
       error = (typeof error === 'string') ? {error} : error;
       log.error(logMessage, Object.assign({}, logData, error));
       return error;
     }
-    if (res.data.status === 'FAILURE') {
+    if (result.status === 'FAILURE') {
       // log.error(logMessage, Object.assign(logData, res.data));
       throw res;
     }
-    log.info(logMessage, Object.assign({}, logData, res.data));
-    return res.data;
+    log.info(logMessage, Object.assign({}, logData, result));
+    return result;
   }
 
   _keepAlive(lastSessionTimeDiff, username) {

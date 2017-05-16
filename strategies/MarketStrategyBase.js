@@ -136,7 +136,7 @@ class MarketStrategyBase {
       return;
     }
 
-    //changes - bot logic
+    //changes - bot logic && this.runners !== empty
     if (data.op === 'mcm' && data.mc && data.mc.length) {
       const runnerChanges = data.mc[0].rc;
 
