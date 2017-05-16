@@ -19,15 +19,11 @@ class MarketStrategyBase {
     this.runners = {};
     this.debug = false;
     this.bank = 0;
-    event.on(`${this.username}:orderData`, this._handleOrderData.bind(this));
-    // this._listenForOrderData();
-  }
 
-  // _listenForOrderData() {
-  //   const handleOrderData = this._handleOrderData.bind(this);
-  //   Object.defineProperty(handleOrderData, 'name', {value: `${handleOrderData}`, writable: false});
-  //   event.on(`${this.username}:orderData`,);
-  // }
+    if (event.eventNames().indexOf(`${this.username}:${this.strategyName}:orderData`) === -1) {
+      event.on(`${this.username}:${this.strategyName}:orderData`, this._handleOrderData.bind(this));
+    }
+  }
 
   _handleOrderData(data) {
     //first image
@@ -121,9 +117,9 @@ class MarketStrategyBase {
 
   }
 
-  removeListener() {
-    event.removeListener(`${this.username}:orderData`, this._handleOrderData);
-  }
+  // removeListener() {
+  //   event.removeListener(`${this.username}:orderData`, this._handleOrderData);
+  // }
 
   /**
    * @param data

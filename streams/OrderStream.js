@@ -11,7 +11,7 @@ class OrderStream extends StreamBase {
   }
 
   _processData(data) {
-    event.emit(`${this.username}:orderData`, data);
+    event.emit(`${this.username}:${this.strategy.strategy}:orderData`, data);
   }
 
 }
